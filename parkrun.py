@@ -10,6 +10,7 @@ import datetime as dt
 
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.stats as st
 
 sample_response_file_name = 'out/sample_response.pkl'
 run_ids_file_name = 'out/run_ids.pkl'
@@ -217,7 +218,6 @@ def plot_yearly_average_time():
         avg_ax.scatter(dates_this_year, vals_this_year[:, 1]/60, label=year)
         min_ax.scatter(dates_this_year, vals_this_year[:, 2]/60, label=year)
 
-
     from calendar import monthrange, month_name 
     month_lengths = [0]
     for month_idx in range(1,12):
@@ -243,10 +243,6 @@ def plot_yearly_average_time():
     min_ax.set_xlabel('Time of Year')
     min_ax.set_ylabel('Minimum Parkrun Time (minutes)')
 
-
-        
-
-    
     #plt.plot(avg_times[:, 0], avg_times[:, 2]/60)
 
     #times = data_table[:, 0].astype(int)
@@ -254,10 +250,36 @@ def plot_yearly_average_time():
 
     plt.show()
 
+def plot_female_21_24():
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+    
+    data_table = np.array([
+        [int(row.time), int(row.event_id)] for row in all_rows if (row.athlete_id != -1) and ('SW20-24' in row.age_group)
+        ])
+    times = data_table[:, 0]/60
 
-    print(output)
+    mean, median, mode = (np.mean(times), np.median(times), st.mode(list(map(lambda x:int(x), times)))[0][0])
+    
+    fig, ax = plt.subplots(1,1)
+    ax.hist(times, bins=np.arange(int(np.min(times)), int(np.max(times))+1))
+    y_lims = ax.get_ylim()
 
+    from matplotlib.offsetbox import AnchoredText
+    anchored_text = AnchoredText(
+            'Mean: '+ str(round(mean, 2) ) + 'm\n' + 
+            'Median: '+ str(round(median, 2)) + 'm\n' +
+            'Mode: '+ str(mode) + '-' + str(mode+1) + 'm'
+            , 
+            loc='upper right', frameon=False)
+    ax.add_artist(anchored_text)
 
+    ax.set_xlabel('Time (minutes)')
+    ax.set_ylabel('Amount of times registered')
+    ax.set_title('Eastville Parkrun times for women between 20 and 24 years old')
+
+    ax.set_ylim(y_lims)
+    plt.show()
 
 if __name__ == "__main__":
     #grab_all_run_ids()
@@ -267,4 +289,5 @@ if __name__ == "__main__":
 
     #generate_full_run_table('eastville')
     #plot_all_row_entry_times()
-    plot_yearly_average_time()
+    #plot_yearly_average_time()
+    plot_female_21_24()

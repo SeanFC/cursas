@@ -1,0 +1,6 @@
+#!/bin/sh
+
+#uwsgi -L --uwsgi-socket 127.0.0.1:3031 --plugin python --pythonpath /home/sean/projects/parkrun_data -w serv
+#uwsgi -L --scgi-socket 127.0.0.1:3031 --plugin python --pythonpath /home/sean/projects/parkrun_data -w serv
+#uwsgi -L --http-socket 127.0.0.1:3031 --plugin python --pythonpath /home/sean/projects/parkrun_data -w serv
+uwsgi -L --http-socket 127.0.0.1:3031 --plugin python --pythonpath /home/sean/projects/parkrun_data -w visualise 

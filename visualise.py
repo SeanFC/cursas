@@ -1,3 +1,5 @@
+#TODO: Change name to Glaucus
+
 import random
 import time
 from extract import generate_full_run_table
@@ -186,6 +188,6 @@ if __name__ == "__main__":
     #generate_full_run_table('eastville')
     #plot_all_row_entry_times()
     #plot_yearly_average_time()
-    app.run_server(debug=True, use_reloader=True)  # Turn off reloader if inside Jupyter
+    app.run_server(debug=True, use_reloader=True)  
 
     #generate_full_run_table('eastville')

@@ -1,0 +1,17 @@
+[Service]
+Type=simple
+[Unit]
+Description=Run the server for the Glaucus website
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=pi
+ExecStart=/bin/bash /home/pi/cursus/parkrun_data/serv_run
+StandardOutput=/tmp/glaucus.log
+StandardError=/tmp/glaucus_error.log
+
+[Install]
+WantedBy=multi-user.target

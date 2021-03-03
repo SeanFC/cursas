@@ -2,4 +2,5 @@
 #TODO: This doesn't respect sections
 source <(grep = config/cursas.ini)
 
-scp cursas $target/cursas
+rsync -a cursas -e "ssh -p $port" "$target/cursas"
+rsync -a serv_run -e "ssh -p $port" "$target"

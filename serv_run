@@ -3,4 +3,4 @@
 #TODO: This doesn't respect sections
 source <(grep = config/cursas.ini)
 
-uwsgi --http-socket 127.0.0.1:3031 --plugin python --pythonpath $target --wsgi-file cursas/wsgi.py
+uwsgi --http-socket 127.0.0.1:3031 --plugin python --pythonpath $(pwd)/cursas --wsgi-file cursas/wsgi.py

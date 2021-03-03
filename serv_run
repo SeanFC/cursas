@@ -1,6 +1,6 @@
 #!/bin/sh
+# Pull in the config values
+#TODO: This doesn't respect sections
+source <(grep = config/cursas.ini)
 
-#uwsgi -L --uwsgi-socket 127.0.0.1:3031 --plugin python --pythonpath /home/sean/projects/parkrun_data -w serv
-#uwsgi -L --scgi-socket 127.0.0.1:3031 --plugin python --pythonpath /home/sean/projects/parkrun_data -w serv
-#uwsgi -L --http-socket 127.0.0.1:3031 --plugin python --pythonpath /home/sean/projects/parkrun_data -w serv
-uwsgi -L --http-socket 127.0.0.1:3031 --plugin python --pythonpath /home/sean/projects/parkrun_data -w visualise 
+uwsgi --http-socket 127.0.0.1:3031 --plugin python --pythonpath $target --wsgi-file cursas/wsgi.py

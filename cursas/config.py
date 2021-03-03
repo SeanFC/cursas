@@ -1,4 +1,16 @@
-data_dir = '/home/sean/projects/parkrun_data/out/'
-sample_response_file_name = data_dir + 'sample_response.pkl'
-run_ids_file_name = data_dir + 'run_ids.pkl'
-full_table_file_name = data_dir + 'eastville_entries.pkl'
+#TODO: This module makes loads of globals. It should return and object that can be used for config or something like that
+
+import os
+import configparser
+
+config_file_path='config/cursas.ini'
+
+# Read in any configuration file given
+config = configparser.ConfigParser()
+if config_file_path:
+    config.read(config_file_path)
+
+data_dir = os.path.expanduser(config['database']['data_dir'])
+sample_response_file_name = data_dir + config['database']['sample_response_file_name']
+run_ids_file_name = data_dir + config['database']['run_ids_file_name']
+full_table_file_name = data_dir + config['database']['full_table_file_name']

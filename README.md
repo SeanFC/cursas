@@ -1,6 +1,6 @@
 # Cursas 
 
-Visualise data from Parkrun and make predictions.
+Visualise data from Parkrun and make predictions. This repository include tools for generating the website found [here](https://www.sfcleator.com/cursas)
 
 Part of the Sudorn project.
 

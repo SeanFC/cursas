@@ -2,8 +2,6 @@
 
 import random
 import time
-from extract import generate_full_run_table
-from extract import RunEvent, ResultEntry
 import pickle as pkl
 
 import pandas as pd
@@ -11,12 +9,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as st
 
-import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
                                                                                           
-from config import *
+from cursas.config import *
+from cursas.extract import generate_full_run_table
+from cursas.extract import RunEvent, ResultEntry
+
 
 def plot_all_row_entry_times():
     with open(full_table_file_name, 'rb') as f:  
@@ -171,13 +171,6 @@ def plot_female_21_24(app):
     ])
     
     return app
-
-app = dash.Dash(
-        title='Cursus',
-        url_base_pathname='/cursus/',
-        )
-app = plot_female_21_24(app)
-application = app.server
 
 if __name__ == "__main__":
     #grab_all_run_ids()

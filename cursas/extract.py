@@ -8,7 +8,7 @@ import datetime as dt
 
 import re
 
-from config import *
+from cursas.config import *
 
 class RunEvent():
     def __init__(self, header, run_name, event_id):
@@ -66,10 +66,8 @@ class ResultEntry():
         return "<ResultEntry Object, athl id={}>".format(self.athlete_id)
 
 def grab_latest_run():
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 5.1; rv:7.0.1) Gecko/20100101 Firefox/7.0.1',
-    }
-    response = requests.get('https://www.parkrun.org.uk/eastville/results/latestresults/', headers=headers)
+    headers = {'User-Agent': user_agent,}
+    response = requests.get(external_website_db+'/eastville/results/latestresults/', headers=headers)
 
     with open(sample_response_file_name, 'wb') as f:  
         pkl.dump((response), f)
@@ -95,10 +93,8 @@ def plot_single_run(race_entries):
     plt.show()
 
 def grab_all_run_ids():
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 5.1; rv:7.0.1) Gecko/20100101 Firefox/7.0.1',
-    }
-    response = requests.get('https://www.parkrun.org.uk/eastville/results/eventhistory/', headers=headers)
+    headers = {'User-Agent': user_agent,}
+    response = requests.get(external_website_db+'/eastville/results/eventhistory/', headers=headers)
 
     with open(run_ids_file_name, 'wb') as f:  
         pkl.dump((response), f)
@@ -114,16 +110,14 @@ def parse_all_run_ids():
     return [ r.find("td").find("a").string for r in table_rows ]
 
 def grab_all_runs_from_ids(ids):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 5.1; rv:7.0.1) Gecko/20100101 Firefox/7.0.1',
-    }
+    headers = {'User-Agent': user_agent,}
     only_files = [f.split('.')[0] for f in listdir('out/eastville') if isfile(join('out/eastville', f))]
     target_ids = list(set(ids) - set(only_files))#[:2]
 
     random.shuffle(target_ids)
     for cur_id in target_ids:
         print(cur_id)
-        response = requests.get('https://www.parkrun.org.uk/eastville/results/weeklyresults/?runSeqNumber={}'.format(cur_id), headers=headers)
+        response = requests.get(external_website_db+'/eastville/results/weeklyresults/?runSeqNumber={}'.format(cur_id), headers=headers)
 
         with open('out/eastville/{}.pkl'.format(cur_id), 'wb') as f:  
             pkl.dump((response), f)

@@ -8,6 +8,7 @@ Name from 'cursus', Latin for running.
 
 # TODO
 * Complete list of requirements 
+* Systemd server isn't customised
 
 ## Contact
 Maintained by Sean F. Cleator

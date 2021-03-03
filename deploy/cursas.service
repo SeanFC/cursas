@@ -1,7 +1,7 @@
 [Service]
 Type=simple
 [Unit]
-Description=Run the server for the Glaucus website
+Description=Run the server for the Cursas website
 StartLimitIntervalSec=0
 
 [Service]
@@ -9,9 +9,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=pi
-ExecStart=/bin/bash /home/pi/cursus/parkrun_data/serv_run
-StandardOutput=/tmp/glaucus.log
-StandardError=/tmp/glaucus_error.log
+ExecStart=/bin/bash ~/sudorn/cursas/serv_run
 
 [Install]
 WantedBy=multi-user.target

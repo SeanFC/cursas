@@ -5,9 +5,11 @@ set -e
 #TODO: This doesn't respect sections
 source <(grep = config/cursas.ini)
 
-git push origin master
+#git push origin master
 
 ssh -p "$port" "$target" "\
     cd $deploy_path; \
     git pull origin master; \
+    pip install .
+    sudo systemctl
     "

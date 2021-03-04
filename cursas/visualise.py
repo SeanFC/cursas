@@ -1,4 +1,4 @@
-#TODO: Change name to Glaucus
+#TODO: Move out mpl
 
 import random
 import time
@@ -49,7 +49,7 @@ def plot_all_row_entry_times():
 
     print(output)
 
-def plot_yearly_average_time():
+def mpl_plot_yearly_average_time():
     #TODO: Some of the times of the last rows are being parse incorrectly
     with open(full_table_file_name, 'rb') as f:  
         all_events, all_rows = pkl.load(f)
@@ -72,6 +72,7 @@ def plot_yearly_average_time():
             np.nanmin(cur_times)
             ])
     avg_times = np.array(avg_times)
+
     fig, axes = plt.subplots(2, 1, sharex=True)
     avg_ax = axes[0]
     min_ax = axes[1]
@@ -114,6 +115,87 @@ def plot_yearly_average_time():
 
     plt.show()
 
+
+def plot_yearly_average_time():
+    #TODO: Some of the times of the last rows are being parse incorrectly
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+    
+    data_table = np.array([
+        [int(row.time), int(row.event_id)] for row in all_rows if (row.athlete_id != -1)
+        ])
+
+    event_ids = np.unique(data_table[:, 1])
+    event_date_lookup = dict( (x.event_id, x.date) for x in all_events)
+
+    import datetime as dt
+
+    #TODO: Not a great way to make this dataframe
+    avg_times = []
+    for e_id in event_ids:
+        cur_times = np.array(data_table[data_table[:, 1] == e_id][:, 0], dtype=float)
+        cur_times[cur_times <= 7*60] = np.nan
+        avg_times.append([
+            str(event_date_lookup[f'{e_id}'].year), # Cast to string here makes the plotting of the scatter separate into different groups
+            (event_date_lookup[f'{e_id}'] - dt.date(event_date_lookup[f'{e_id}'].year, 1, 1)).days, 
+            event_date_lookup[f'{e_id}'].strftime('%d %B %Y'), 
+            np.nanmean(cur_times)/60,
+            np.nanmin(cur_times)/60
+            ])
+    avg_times = np.array(avg_times)
+    df = pd.DataFrame(avg_times, columns=['Event Year', 'Day of Year', 'Event Date', 'Mean Time', 'Min Time'])
+
+    fig = px.scatter(df, x='Day of Year', y='Mean Time', color='Event Year', hover_name='Event Date') 
+
+    from calendar import monthrange, month_name 
+    month_lengths = np.array([ monthrange(2011, month_idx)[1] for month_idx in range(1,13)])
+
+    #TODO: Can't get these axis labels to be in the middle of the months
+    fig.update_layout(
+        title="Average Eastville Parkrun times",
+        xaxis = dict(
+            tickmode='array',
+            tickvals=np.array([0, *np.cumsum(month_lengths[:-1])]),# + month_lengths/2,
+            ticktext=month_name[1:],
+            showgrid=True,
+            gridcolor='white',
+        ),
+        yaxis=dict(showgrid=False),
+    ) 
+
+    return fig
+    #from calendar import monthrange, month_name 
+    #month_lengths = [0]
+    #for month_idx in range(1,12):
+    #    month_lengths.append(monthrange(2011, month_idx)[1])
+    #avg_ax.set_xticks(np.cumsum(month_lengths))
+    #avg_ax.set_xticklabels(month_name[1:], rotation=45)
+    #avg_ax.legend(title='Year')
+    #avg_ax.grid()
+    #avg_ax.set_xlim([0, 366])
+    #fig.suptitle(all_events[0].run_name.title())
+    #avg_ax.set_ylabel('Average Parkrun Time (minutes)')
+
+    #from calendar import monthrange, month_name 
+    #month_lengths = [0]
+    #for month_idx in range(1,12):
+    #    month_lengths.append(monthrange(2011, month_idx)[1])
+    #min_ax.set_xticks(np.cumsum(month_lengths))
+    #min_ax.set_xticklabels(month_name[1:], rotation=45)
+    ##min_ax.legend()
+    #min_ax.grid()
+    #min_ax.set_xlim([0, 366])
+    #fig.suptitle(all_events[0].run_name.title())
+    #min_ax.set_xlabel('Time of Year')
+    #min_ax.set_ylabel('Minimum Parkrun Time (minutes)')
+
+    #plt.plot(avg_times[:, 0], avg_times[:, 2]/60)
+
+    #times = data_table[:, 0].astype(int)
+    #plt.hist(times/60, bins=400, histtype='step', label=group)
+
+    plt.show()
+
 def mpl_time_hiso_plot(times, data_table):
     mean, median, mode = (np.mean(times), np.median(times), st.mode(list(map(lambda x:int(x), times)))[0][0])
     
@@ -137,8 +219,7 @@ def mpl_time_hiso_plot(times, data_table):
     ax.set_ylim(y_lims)
     plt.show()
 
-
-def plot_female_21_24(app):
+def plot_female_21_24():
     with open(full_table_file_name, 'rb') as f:  
         all_events, all_rows = pkl.load(f)
 
@@ -166,21 +247,16 @@ def plot_female_21_24(app):
     fig.update_traces(opacity=0.75)
     #fig.show()
 
+        
+    return fig
+
+def build_full_app(app):
     app.layout = html.Div([
-        dcc.Graph(figure=fig)
+        dcc.Graph(figure=plot_yearly_average_time()),
+        dcc.Graph(figure=plot_female_21_24()),
     ])
-    
+
     return app
 
 if __name__ == "__main__":
-    #grab_all_run_ids()
-
-    #event_ids = parse_all_run_ids()
-    #grab_all_runs_from_ids(event_ids)
-
-    #generate_full_run_table('eastville')
-    #plot_all_row_entry_times()
-    #plot_yearly_average_time()
-    app.run_server(debug=True, use_reloader=True)  
-
-    #generate_full_run_table('eastville')
+    plot_yearly_average_time()

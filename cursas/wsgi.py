@@ -1,10 +1,10 @@
 import dash
 
-from cursas.visualise import plot_female_21_24
+from cursas.visualise import build_full_app 
 
 app = dash.Dash(
         title='Cursas',
         url_base_pathname='/cursas/',
         )
-app = plot_female_21_24(app)
+app = build_full_app(app)
 application = app.server

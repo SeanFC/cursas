@@ -9,7 +9,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=pi
-ExecStart=/bin/bash /home/sean/sudorn/cursas/serv_run
+ExecStart=/bin/bash /home/pi/sudorn/cursas/serv_run
 
 [Install]
 WantedBy=multi-user.target

@@ -10,6 +10,6 @@ git push origin master
 ssh -p "$port" "$target" "\
     cd $deploy_path; \
     git pull origin master; \
-    sudo systemctl daemon-reload; \
-    sudo systemctl restart cursas; \
+    sudo -S systemctl daemon-reload; \
+    sudo -S systemctl restart cursas; \
     "

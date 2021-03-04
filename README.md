@@ -6,9 +6,18 @@ Part of the Sudorn project.
 
 Name from 'cursus', Latin for running. 
 
+## Deploy
+
+Deployment requires a server running with:
+* a user that can run uwsgi and Cursas
+* an appropriate cursas.ini file
+* a Cursas repository set up with it's origin to pull from the same repository was being pushed to
+
+
 # TODO
 * Complete list of requirements 
-* Systemd server isn't customised
+* Deploy still requires some server side setup
+* Lots of confusing config options
 
 ## Contact
 Maintained by Sean F. Cleator

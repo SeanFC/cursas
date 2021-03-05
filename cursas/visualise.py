@@ -363,22 +363,33 @@ def plot_single_performance():
 
     return fig
 
+def get_navbar():
+    return html.Ul(
+            children=[
+                html.Li(html.A('Home', href='/')),
+                html.Li(html.A('Cursas', href='', className="active")),
+                html.Li(html.A('Repositories', href='/cgit')),
+                html.Li(html.A('Contact', href='/contact'), style={'float':'right'}),
+                ]
+            )
 
 def build_full_app(app):
     app.layout = html.Div([
-        html.H1(children='Cursas', style={'textAlign': 'center'}),
-        #html.Div(
-        #    [
-        #        html.Div(children='a', style={'float':'right'}),
-        #        html.Div(children='b', style={'float':'right'}),
-        #        html.Div(children='c', style={'float':'right'}),
-        #        ]
-        #    ),
+        #<ul>
+        #  <li><a href="sfcleator.com">Home</a></li>
+        #  <li><a class="active" href="sfcleator.com/cursas">Cursas</a></li>
+        #  <li><a href="sfcleator.com/cgit">Repositories</a></li>
+        #  <li><a href="#about">About</a></li>
+        #</ul>
+        get_navbar(),
         dcc.Graph(figure=plot_yearly_average_time()),
         dcc.Graph(figure=plot_female_21_24()),
         dcc.Graph(figure=plot_overall_run_amounts()),
         dcc.Graph(figure=plot_single_performance()),
     ])
+    import os
+    css_path = os.getcwd() + '/assets/header.css'
+    #app.css.append_css('../assets')
 
     return app
 

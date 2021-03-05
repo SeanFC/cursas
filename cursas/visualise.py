@@ -1,4 +1,5 @@
 #TODO: Move out mpl
+#TODO: Pre-calculate all of these statistics ahead of time
 
 import random
 import time
@@ -246,14 +247,137 @@ def plot_female_21_24():
     fig.update_layout(barmode='overlay')
     fig.update_traces(opacity=0.75)
     #fig.show()
-
         
     return fig
 
+def plot_overall_run_amounts():
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+
+    athlete_ids = np.array([
+            int(row.athlete_id) for row in all_rows if row.athlete_id != -1
+            ])
+    counts = np.array([
+        np.count_nonzero(athlete_ids == cur_id)
+        for cur_id in np.unique(athlete_ids)
+        ])
+    binned_counts = np.histogram(counts, bins=np.arange(1, np.amax(counts)+1))
+        
+    df = pd.DataFrame({
+        'Completed Runs': binned_counts[1][:-1],
+        'Number of Runners': binned_counts[0],
+        })
+    fig = px.bar(df, x='Completed Runs', y='Number of Runners', log_y=True)
+
+    for shirt_val in [50, 100, 250, 500]:
+        if df['Completed Runs'].max()*1.1 > shirt_val:
+            fig.add_vline(x=shirt_val)
+
+    fig.update_layout(
+        title="Eastville Parkrun distribution of runners that completed a number of runs"
+        )
+
+    return fig
+
+def plot_attendance():
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+
+    #TODO: Not a very clean way to do this
+    event_ids = np.array([ int(row.event_id) for row in all_rows ])
+    df = pd.DataFrame([{
+        'Event ID':int(cur_id),
+        'Attendance':np.count_nonzero(event_ids == cur_id)
+        }
+        for cur_id in np.unique(event_ids)
+        ])
+
+    date_df = pd.DataFrame([{
+        'Event ID':int(cur_event.event_id),
+        'Time':cur_event.date
+        }
+        for cur_event in all_events
+        ])
+    df = df.merge(date_df, on='Event ID')
+    df.set_index('Event ID', inplace=True)
+
+    fig = px.line(df, x='Time', y='Attendance') #Note: Should probably be a bar chart really
+
+    fig.update_layout(
+        title="Attendance at Eastville Parkrun"
+        )
+
+    return fig
+
+def plot_single_performance():
+    subject_name = 'Sean CLEATOR'
+
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+
+    #TODO: Not a very clean way to do this
+    event_ids = np.array([ int(row.event_id) for row in all_rows ])
+    df = pd.DataFrame([{
+        'Event ID':int(cur_row.event_id),
+        'Run Time':cur_row.time/60,
+        'Position':cur_row.position,
+        }
+        for cur_row in all_rows if cur_row.name == subject_name
+        ])
+
+    date_df = pd.DataFrame([{
+        'Event ID':int(cur_event.event_id),
+        'Time':cur_event.date
+        }
+        for cur_event in all_events
+        ])
+
+    df = df.merge(date_df, on='Event ID')
+    df.set_index('Event ID', inplace=True)
+    df.sort_values('Time', inplace=True)
+
+    #fig = px.line(df, x='Time', y='Run Time') #Note: Should probably be a bar chart really
+
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    # Create figure with secondary y-axis
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    fig.add_trace(
+        go.Scatter(x=df['Time'], y=df['Run Time'], name="Run Time"),
+        secondary_y=False,
+    )
+
+    fig.add_trace(
+        go.Scatter(x=df['Time'], y=df['Position'], name="Position"),
+        secondary_y=True,
+    )
+
+    fig.update_layout(
+            title=f"The performance of {subject_name.title()} at Eastville Parkrun",
+            xaxis=dict(title='Time'),
+            yaxis=dict(title='Run Time (m)'),
+            yaxis2=dict(title='Position'),
+            )
+
+    return fig
+
+
 def build_full_app(app):
     app.layout = html.Div([
+        html.H1(children='Cursas', style={'textAlign': 'center'}),
+        #html.Div(
+        #    [
+        #        html.Div(children='a', style={'float':'right'}),
+        #        html.Div(children='b', style={'float':'right'}),
+        #        html.Div(children='c', style={'float':'right'}),
+        #        ]
+        #    ),
         dcc.Graph(figure=plot_yearly_average_time()),
         dcc.Graph(figure=plot_female_21_24()),
+        dcc.Graph(figure=plot_overall_run_amounts()),
+        dcc.Graph(figure=plot_single_performance()),
     ])
 
     return app

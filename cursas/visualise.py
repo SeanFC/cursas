@@ -344,19 +344,19 @@ def plot_single_performance():
     # Create figure with secondary y-axis
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    fig.add_trace(
-        go.Scatter(x=df['Time'], y=df['Run Time'], name="Run Time"),
-        secondary_y=False,
-    )
-
-    fig.add_trace(
-        go.Scatter(x=df['Time'], y=df['Position'], name="Position"),
-        secondary_y=True,
-    )
+    #x_axis_vals = df['Time']
+    x_axis_vals = np.arange(df.shape[0], dtype=np.int) + 1
+    fig.add_trace(go.Scatter(x=x_axis_vals, y=df['Run Time'], name="Run Time"), secondary_y=False)
+    fig.add_trace(go.Scatter(x=x_axis_vals, y=df['Position'], name="Position"), secondary_y=True)
 
     fig.update_layout(
             title=f"The performance of {subject_name.title()} at Eastville Parkrun",
-            xaxis=dict(title='Time'),
+            xaxis=dict(
+                title='Run Number',
+                #title='Time',
+                tickmode='array',
+                tickvals=x_axis_vals,
+                ),
             yaxis=dict(title='Run Time (m)'),
             yaxis2=dict(title='Position'),
             )
@@ -365,6 +365,7 @@ def plot_single_performance():
 
 def get_navbar():
     return html.Ul(
+            className="topnav",
             children=[
                 html.Li(html.A('Home', href='/')),
                 html.Li(html.A('Cursas', href='', className="active")),
@@ -382,9 +383,9 @@ def build_full_app(app):
         #  <li><a href="#about">About</a></li>
         #</ul>
         get_navbar(),
-        dcc.Graph(figure=plot_yearly_average_time()),
-        dcc.Graph(figure=plot_female_21_24()),
-        dcc.Graph(figure=plot_overall_run_amounts()),
+        #dcc.Graph(figure=plot_yearly_average_time()),
+        #dcc.Graph(figure=plot_female_21_24()),
+        #dcc.Graph(figure=plot_overall_run_amounts()),
         dcc.Graph(figure=plot_single_performance()),
     ])
     import os

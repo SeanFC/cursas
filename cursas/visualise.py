@@ -386,7 +386,7 @@ def build_full_app(app):
         #dcc.Graph(figure=plot_yearly_average_time()),
         #dcc.Graph(figure=plot_female_21_24()),
         #dcc.Graph(figure=plot_overall_run_amounts()),
-        dcc.Graph(figure=plot_single_performance()),
+        #dcc.Graph(figure=plot_single_performance()),
     ])
     import os
     css_path = os.getcwd() + '/assets/header.css'

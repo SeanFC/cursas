@@ -18,6 +18,7 @@ Deployment requires a server running with:
 * Complete list of requirements 
 * Deploy still requires some server side setup
 * Lots of confusing config options
+* Need to use assets of wider website
 
 ## Contact
 Maintained by Sean F. Cleator

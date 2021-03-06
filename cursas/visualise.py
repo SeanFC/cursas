@@ -388,8 +388,8 @@ def build_full_app(app):
         #dcc.Graph(figure=plot_overall_run_amounts()),
         #dcc.Graph(figure=plot_single_performance()),
     ])
-    import os
-    css_path = os.getcwd() + '/assets/header.css'
+    #import os
+    #css_path = os.getcwd() + '/assets/header.css'
     #app.css.append_css('../assets')
 
     return app

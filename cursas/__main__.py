@@ -17,7 +17,9 @@ app = dash.Dash(
         title='Cursas',
         url_base_pathname='/cursas/',
         assets_folder='../assets',
-        assets_ignore=re.escape('*.scss')
+        assets_ignore=re.escape('*.scss'),
+        #assets_external_path='https://www.sfcleator.com/assets'
+        meta_tags =[dict(name="viewport", content="width=device-width, initial-scale=1.0")]
         )
 app = build_full_app(app)
 application = app.server

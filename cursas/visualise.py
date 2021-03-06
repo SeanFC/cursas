@@ -292,21 +292,36 @@ def plot_attendance():
         for cur_id in np.unique(event_ids)
         ])
 
+    import datetime as dt
     date_df = pd.DataFrame([{
         'Event ID':int(cur_event.event_id),
-        'Time':cur_event.date
+        'Time':(cur_event.date - dt.date(cur_event.date.year, 1, 1)).days,
+        'Year':cur_event.date.year
         }
         for cur_event in all_events
         ])
     df = df.merge(date_df, on='Event ID')
     df.set_index('Event ID', inplace=True)
 
-    fig = px.line(df, x='Time', y='Attendance') #Note: Should probably be a bar chart really
+    fig = px.line(df, x='Time', y='Attendance', color='Year') #Note: Should probably be a bar chart really
 
+
+    from calendar import monthrange, month_name 
+    month_lengths = np.array([ monthrange(2011, month_idx)[1] for month_idx in range(1,13)])
+
+    #TODO: Order these by event in the year so that each year can be compared together
+    #TODO: Can't get these axis labels to be in the middle of the months
     fig.update_layout(
-        title="Attendance at Eastville Parkrun"
-        )
-
+        title="Attendance at Eastville Parkrun",
+        xaxis = dict(
+            tickmode='array',
+            tickvals=np.array([0, *np.cumsum(month_lengths[:-1])]),# + month_lengths/2,
+            ticktext=month_name[1:],
+            showgrid=True,
+            gridcolor='white',
+        ),
+        yaxis=dict(showgrid=False),
+    ) 
     return fig
 
 def plot_single_performance():
@@ -385,9 +400,6 @@ def build_full_app(app):
                dcc.Graph(figure=plot_single_performance()),
                dcc.Graph(figure=plot_attendance()),
     ])])])
-    #import os
-    #css_path = os.getcwd() + '/assets/header.css'
-    #app.css.append_css('../assets')
 
     return app
 

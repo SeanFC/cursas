@@ -388,17 +388,50 @@ def get_navbar():
                 html.Li(html.A('Contact', href='/contact.html'), style={'float':'right'}),
                 ]
             )
-
 def build_full_app(app):
+    #TODO: Tabs don't change colour on hover
+    default_tab_style = {
+            'display': 'block', 
+            'color': 'white',
+            'text-align': 'center',
+            'padding': '7px 8px', 
+            'text-decoration': 'none',
+            'border-width': '0px',
+            'border-color': '#3275c8'
+            }
+    unselected_tab_style = {**default_tab_style, 'background-color': '#333'}
+    selected_tab_style = {**default_tab_style, 'background-color': '#3275c8'}
+
     app.layout = html.Div(className="grid-container", children=[
         html.Div(className="main", children=[
             html.Div(className="header", children=[
-               get_navbar(),
-               dcc.Graph(figure=plot_yearly_average_time()),
-               dcc.Graph(figure=plot_female_21_24()),
-               dcc.Graph(figure=plot_overall_run_amounts()),
-               dcc.Graph(figure=plot_single_performance()),
-               dcc.Graph(figure=plot_attendance()),
+                get_navbar(),
+                dcc.Tabs([
+                    dcc.Tab(label='Overview', children=[
+                        dcc.Graph(figure=plot_female_21_24()),
+                        ],
+                        style=unselected_tab_style,
+                        selected_style=selected_tab_style
+                        ),
+                    dcc.Tab(label='Location', children=[
+                        dcc.Graph(figure=plot_yearly_average_time()),
+                        dcc.Graph(figure=plot_attendance()),
+                        dcc.Graph(figure=plot_overall_run_amounts()),
+                        ],
+                        style=unselected_tab_style,
+                        selected_style=selected_tab_style
+                        ),
+                    dcc.Tab(label='Runner', children=[
+                        dcc.Graph(figure=plot_single_performance()),
+                        ],
+                        style=unselected_tab_style,
+                        selected_style=selected_tab_style
+                        ),
+                    ], 
+                    style={
+                        'background-color':'#333'
+                        }
+                    )
     ])])])
 
     return app

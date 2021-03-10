@@ -220,7 +220,7 @@ def mpl_time_hiso_plot(times, data_table):
     ax.set_ylim(y_lims)
     plt.show()
 
-def plot_female_21_24():
+def plot_runner_time_distribution():
     with open(full_table_file_name, 'rb') as f:  
         all_events, all_rows = pkl.load(f)
 
@@ -228,7 +228,7 @@ def plot_female_21_24():
 
     for code, sex in zip(['W', 'M'], ['Female', 'Male']):
         times = np.array([
-            int(row.time) for row in all_rows if (row.athlete_id != -1) and (f'S{code}25-29' in row.age_group)
+            int(row.time) for row in all_rows if (row.athlete_id != -1) and (f'{code}' in row.age_group) and ('J' not in row.age_group) #TODO: Junior excluded here
             ])
         times = times/60
         df = df.append(pd.DataFrame({'Time':times, 'Sex':[sex]*len(times)}), ignore_index=True)
@@ -238,7 +238,7 @@ def plot_female_21_24():
     fig = px.histogram(df, x='Time', color='Sex') #TODO: Need minute bins
 
     fig.update_layout(
-        title="Eastville Parkrun times for runners between 25 and 29 years old",
+        title="Eastville Parkrun times for adult runners",
         xaxis_title="Time (minutes)",
         yaxis_title="Amount of times registered",
         legend_title="Sex",
@@ -378,6 +378,7 @@ def plot_single_performance():
 
     return fig
 
+#TODO: Move the below stuff to it's own module 
 def get_navbar():
     return html.Ul(
             className="topnav",
@@ -388,8 +389,52 @@ def get_navbar():
                 html.Li(html.A('Contact', href='/contact.html'), style={'float':'right'}),
                 ]
             )
+
+def get_overview_tab():
+    return [dcc.Markdown('''
+    # Explore Parkun UK data
+
+    Parkrun is a series of free to enter 5 kilometre running races run most Saturdays at 9AM across the world with many races taking places in the United Kingdom.
+    Finish times are posted on the [Parkrun website](https://www.parkrun.org.uk/) and, after over TODO years of growing involvement, a large dataset has been generated which captures information about the public's running capability.
+    This website presents a cross section of the data with the goal to:
+
+    * Showcase the public's ability to run a 5K race
+    * Help answer questions about Parkrun
+    * Make predictions about attendance and running times
+
+    ## Parkrun as a Whole
+
+    Look at how Parkrun has grown from an initial group of runners to an international event.
+    '''),
+    dcc.Markdown('TODO: Attendance plot and number of run plots')
+    ]
+
+def get_average_event_tab():
+    return [
+            dcc.Markdown('## Statistics of an Average Event'),
+            dcc.Graph(figure=plot_yearly_average_time()),
+            dcc.Graph(figure=plot_attendance()),
+            dcc.Graph(figure=plot_overall_run_amounts()),
+            ]
+
+def get_average_runner_tab():
+    return [
+            dcc.Markdown('## Statistics of a Typical Runner'),
+            dcc.Graph(figure=plot_runner_time_distribution()), #TODO: Do for whole dataset and allow filtering?
+            dcc.Markdown('TODO: scatter average time, fastest time for each sex and age group' ),
+            dcc.Markdown('TODO: scatter average time, amount of runners average over last 12 months for each sex and age group' ),
+            dcc.Graph(figure=plot_single_performance()), #TODO: Move to single runner lookup
+            ]
+
+def get_event_comparison_tab():
+    return [
+            dcc.Markdown('## Compare Different Events'),
+            dcc.Markdown('TODO: scatter average time, amount of runners average over last 12 months for each event'),
+            ]
+
 def build_full_app(app):
     #TODO: Tabs don't change colour on hover
+    #TODO: Rather than setting these options for every tab it would probably be better to set some of them for the whole tabs structure
     default_tab_style = {
             'display': 'block', 
             'color': 'white',
@@ -407,23 +452,19 @@ def build_full_app(app):
             html.Div(className="header", children=[
                 get_navbar(),
                 dcc.Tabs([
-                    dcc.Tab(label='Overview', children=[
-                        dcc.Graph(figure=plot_female_21_24()),
-                        ],
+                    dcc.Tab(label='Overview', children=get_overview_tab(),
                         style=unselected_tab_style,
                         selected_style=selected_tab_style
                         ),
-                    dcc.Tab(label='Location', children=[
-                        dcc.Graph(figure=plot_yearly_average_time()),
-                        dcc.Graph(figure=plot_attendance()),
-                        dcc.Graph(figure=plot_overall_run_amounts()),
-                        ],
+                    dcc.Tab(label='Average Event', children=get_average_event_tab(),
                         style=unselected_tab_style,
                         selected_style=selected_tab_style
                         ),
-                    dcc.Tab(label='Runner', children=[
-                        dcc.Graph(figure=plot_single_performance()),
-                        ],
+                    dcc.Tab(label='Average Runner', children=get_average_runner_tab(),
+                        style=unselected_tab_style,
+                        selected_style=selected_tab_style
+                        ),
+                    dcc.Tab(label='Event Comparison', children=get_event_comparison_tab(),
                         style=unselected_tab_style,
                         selected_style=selected_tab_style
                         ),

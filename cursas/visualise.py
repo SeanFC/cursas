@@ -1,5 +1,6 @@
 #TODO: Move out mpl
 #TODO: Pre-calculate all of these statistics ahead of time
+#TODO: Add record times (world record and PR record) to relevant plots
 
 import random
 import time
@@ -378,6 +379,46 @@ def plot_single_performance():
 
     return fig
 
+def plot_overall_attendance_and_events():
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+
+    #TODO: Not a very clean way to do this
+    event_ids = np.array([ int(row.event_id) for row in all_rows ])
+    df = pd.DataFrame([{
+        'Event ID':int(cur_id),
+        'Attendance':np.count_nonzero(event_ids == cur_id)
+        }
+        for cur_id in np.unique(event_ids)
+        ])
+
+    import datetime as dt
+    date_df = pd.DataFrame([{
+        'Event ID':int(cur_event.event_id),
+        'Time':cur_event.date,#(cur_event.date - dt.date(cur_event.date.year, 1, 1)).days,
+        }
+        for cur_event in all_events
+        ])
+    df = df.merge(date_df, on='Event ID')
+    df.set_index('Event ID', inplace=True)
+    df['Number of Events'] = np.argsort(df['Time'])
+
+    fig = px.line(df, x='Time', y=['Attendance', 'Number of Events']) #Note: Should probably be a bar chart really
+
+    fig.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(step="all")
+                    ])
+                )
+            )
+    return fig
+
 #TODO: Move the below stuff to it's own module 
 def get_navbar():
     return html.Ul(
@@ -406,7 +447,7 @@ def get_overview_tab():
 
     Look at how Parkrun has grown from an initial group of runners to an international event.
     '''),
-    dcc.Markdown('TODO: Attendance plot and number of run plots')
+    dcc.Graph(figure=plot_overall_attendance_and_events()),
     ]
 
 def get_average_event_tab():
@@ -423,7 +464,7 @@ def get_average_runner_tab():
             dcc.Graph(figure=plot_runner_time_distribution()), #TODO: Do for whole dataset and allow filtering?
             dcc.Markdown('TODO: scatter average time, fastest time for each sex and age group' ),
             dcc.Markdown('TODO: scatter average time, amount of runners average over last 12 months for each sex and age group' ),
-            dcc.Graph(figure=plot_single_performance()), #TODO: Move to single runner lookup
+            dcc.Graph(figure=plot_single_performance()), #TODO: Move to single runner lookup tab
             ]
 
 def get_event_comparison_tab():
@@ -476,6 +517,3 @@ def build_full_app(app):
     ])])])
 
     return app
-
-if __name__ == "__main__":
-    plot_yearly_average_time()

@@ -1,10 +1,13 @@
 #TODO: Move out mpl
 #TODO: Pre-calculate all of these statistics ahead of time
 #TODO: Add record times (world record and PR record) to relevant plots
+#TODO: Sex and gender naming mixing 
+#TODO: Use fig.update_layout(hovermode="x unified") where appropriate
 
 import random
 import time
 import pickle as pkl
+import datetime as dt
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -130,7 +133,6 @@ def plot_yearly_average_time():
     event_ids = np.unique(data_table[:, 1])
     event_date_lookup = dict( (x.event_id, x.date) for x in all_events)
 
-    import datetime as dt
 
     #TODO: Not a great way to make this dataframe
     avg_times = []
@@ -392,7 +394,6 @@ def plot_overall_attendance_and_events():
         for cur_id in np.unique(event_ids)
         ])
 
-    import datetime as dt
     date_df = pd.DataFrame([{
         'Event ID':int(cur_event.event_id),
         'Time':cur_event.date,#(cur_event.date - dt.date(cur_event.date.year, 1, 1)).days,
@@ -417,7 +418,150 @@ def plot_overall_attendance_and_events():
                     ])
                 )
             )
+
     return fig
+
+def plot_runner_groups_avg_fast_scatter():
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+
+    all_row_info = np.empty((len(all_rows), 3), dtype=np.object)
+    for row_idx, row in enumerate(all_rows): 
+        #TODO: Junior excluded here
+        #TODO: Don't know what C age group is? 
+        if (row.athlete_id != -1) and (row.age_group != '') and ('J' not in row.age_group) and (row.age_group[2] != 'C'):
+            #TODO: The separation between age group and gender should happen at the DB creation stage
+            all_row_info[row_idx] = [
+                    row.time/60, 
+                    'Men' if row.age_group[1] == 'M' else 'Women', 
+                    row.age_group[2:]
+                    ]
+
+    df = pd.DataFrame(all_row_info, columns=['Time', 'Sex', 'Age Group']) # Note that None rows are automatically ignored
+    df = df[df['Time']>3].dropna() #TODO: Clean up at data input stage
+    df['Time'] = pd.to_numeric(df['Time'])
+
+    stats_df = df.groupby(['Sex', 'Age Group']).agg([
+        'min',
+        'mean', #TODO: Maybe median is better?
+        'count'
+        ]) 
+
+    # Get rid of multi indices and columns
+    stats_df = stats_df.reset_index()
+    stats_df.columns = stats_df.columns.map(lambda x:x[0] if x[1] == '' else x[1])
+    stats_df = stats_df.rename(columns={
+        'min':'Fastest', 
+        'mean':'Average', #TODO: Maybe median is better?
+        'count':'Number of Records'
+        })
+    stats_df = stats_df[stats_df['Number of Records'] > 5] #TODO: Should include all information, create a better plot 
+    
+    fig = px.scatter(stats_df, x='Average', y='Fastest', size='Number of Records', color='Sex', hover_data=['Age Group']) #TODO: Need minute bins
+
+    fig.update_layout(
+        title="Average and Fastest Times for Groups of Runners",
+        xaxis_title="Average Time (minutes)",
+        yaxis_title="Fastest Time (minutes)",
+    )
+
+    return fig
+
+#TODO: Very similar to plot above
+def plot_runner_groups_avg_fast_scatter_12_month():
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+
+    event_date_lookup = dict( (x.event_id, x.date) for x in all_events)
+    cutoff_date = max(event_date_lookup.values())
+    cutoff_date = dt.date(year=cutoff_date.year-1, month=cutoff_date.month, day=cutoff_date.day)
+
+    all_row_info = np.empty((len(all_rows), 3), dtype=np.object)
+    for row_idx, row in enumerate(all_rows): 
+        #TODO: Junior excluded here
+        #TODO: Don't know what C age group is? 
+        if (row.athlete_id != -1) and (row.age_group != '') and ('J' not in row.age_group) and (row.age_group[2] != 'C'):
+            if event_date_lookup[row.event_id] > cutoff_date:
+                #TODO: The separation between age group and gender should happen at the DB creation stage
+                all_row_info[row_idx] = [
+                        row.time/60, 
+                        'Men' if row.age_group[1] == 'M' else 'Women', 
+                        row.age_group[2:],
+                        ]
+
+
+    df = pd.DataFrame(all_row_info, columns=['Time', 'Sex', 'Age Group']) # Note that None rows are automatically ignored
+    df = df[df['Time']>3].dropna() #TODO: Clean up at data input stage
+    df['Time'] = pd.to_numeric(df['Time'])
+
+    stats_df = df.groupby(['Sex', 'Age Group']).agg([
+        'min',
+        'mean', #TODO: Maybe median is better?
+        'count'
+        ]) 
+
+    # Get rid of multi indices and columns
+    stats_df = stats_df.reset_index()
+    stats_df.columns = stats_df.columns.map(lambda x:x[0] if x[1] == '' else x[1])
+    stats_df = stats_df.rename(columns={
+        'min':'Fastest', 
+        'mean':'Average', #TODO: Maybe median is better?
+        'count':'Number of Records'
+        })
+    stats_df = stats_df[stats_df['Number of Records'] > 5] #TODO: Should include all information, create a better plot 
+    
+    fig = px.scatter(stats_df, x='Average', y='Fastest', size='Number of Records', color='Sex', hover_data=['Age Group']) 
+
+    fig.update_layout(
+        title="Average and Fastest Times for Groups of Runners Over the Last 12 Months",
+        xaxis_title="Average Time (minutes)",
+        yaxis_title="Fastest Time (minutes)",
+    )
+
+    return fig
+
+def plot_event_avg_time_and_runners_12_month():
+    #TODO: scatter average time, amount of runners average over last 12 months for each event
+
+    with open(full_table_file_name, 'rb') as f:  
+        all_events, all_rows = pkl.load(f)
+
+    event_date_lookup = {x.event_id:x.date for x in all_events}
+    event_run_name_lookup = {x.event_id:x.run_name for x in all_events}
+    cutoff_date = max(event_date_lookup.values())
+    cutoff_date = dt.date(year=cutoff_date.year-1, month=cutoff_date.month, day=cutoff_date.day)
+
+    all_row_info = np.empty((len(all_rows), 4), dtype='object') #TODO: This can be quite a big object
+    for row_idx, row in enumerate(all_rows): 
+        if (row.athlete_id != -1): #TODO: Should I be excluding these athlete ids
+            all_row_info[row_idx] = [
+                    row.time/60, 
+                    row.event_id,
+                    event_date_lookup[row.event_id],
+                    event_run_name_lookup[row.event_id],
+                    ]
+
+    df = pd.DataFrame(all_row_info, columns=['Time', 'Event ID', 'Date', 'Run Name']).dropna() 
+    df = df[df['Date'] > cutoff_date] # Only last 12 months
+    df['Time'] = pd.to_numeric(df['Time'])
+
+    attendance_counts = df['Event ID'].value_counts()
+    avg_run_attendance = pd.DataFrame({'Attendance': attendance_counts, 'Run Name': [event_run_name_lookup[idx] for idx in attendance_counts.index.to_numpy()]})
+    avg_run_attendance = avg_run_attendance.groupby(['Run Name']).mean()
+
+    avg_run_time = df.groupby(['Run Name'])['Time'].mean()
+
+    run_stats = avg_run_attendance.merge(avg_run_time, on='Run Name')
+    run_stats['Run Name'] = run_stats.index.to_series().apply(lambda x:x.title()) #TODO: A bit sloppy with the titling
+
+    fig = px.scatter(run_stats, x='Attendance', y='Time', hover_name='Run Name') 
+
+    fig.update_layout(
+        title="Different Runs over the Last 12 Months",
+        xaxis_title="Average Attendance",
+        yaxis_title="Average Time (minutes)",
+    )
+    return fig 
 
 #TODO: Move the below stuff to it's own module 
 def get_navbar():
@@ -462,15 +606,15 @@ def get_average_runner_tab():
     return [
             dcc.Markdown('## Statistics of a Typical Runner'),
             dcc.Graph(figure=plot_runner_time_distribution()), #TODO: Do for whole dataset and allow filtering?
-            dcc.Markdown('TODO: scatter average time, fastest time for each sex and age group' ),
-            dcc.Markdown('TODO: scatter average time, amount of runners average over last 12 months for each sex and age group' ),
+            dcc.Graph(figure=plot_runner_groups_avg_fast_scatter()),
+            dcc.Graph(figure=plot_runner_groups_avg_fast_scatter_12_month()),
             dcc.Graph(figure=plot_single_performance()), #TODO: Move to single runner lookup tab
             ]
 
 def get_event_comparison_tab():
     return [
             dcc.Markdown('## Compare Different Events'),
-            dcc.Markdown('TODO: scatter average time, amount of runners average over last 12 months for each event'),
+            dcc.Graph(figure=plot_event_avg_time_and_runners_12_month()),
             ]
 
 def build_full_app(app):
@@ -516,4 +660,10 @@ def build_full_app(app):
                     )
     ])])])
 
+    return app
+
+def build_dev_app(app):
+    app.layout = html.Div(className="grid-container", children=[
+        dcc.Graph(figure=plot_event_avg_time_and_runners_12_month())
+        ])
     return app

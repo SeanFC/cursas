@@ -1,8 +1,10 @@
+import sys
+import re 
+
 import dash
 
 
-from cursas.visualise import build_full_app 
-import re 
+from cursas.visualise import build_full_app, build_dev_app
 
 #from scss.compiler import Compiler
 #compiler = Compiler()
@@ -13,6 +15,7 @@ import re
 #    out_file.write("/* This is a machine generated file, changes may be overwritten */")
 #    out_file.write(convert)
 
+
 app = dash.Dash(
         title='Cursas',
         url_base_pathname='/cursas/',
@@ -21,9 +24,14 @@ app = dash.Dash(
         #assets_external_path='https://www.sfcleator.com/assets'
         meta_tags =[dict(name="viewport", content="width=device-width, initial-scale=1.0")]
         )
-app = build_full_app(app)
-application = app.server
 
+
+if (len(sys.argv) > 1) and (sys.argv[1] == 'dev'):
+    app = build_dev_app(app)
+else:
+    app = build_full_app(app)
+
+application = app.server
 app.run_server(debug=True, use_reloader=True)  
 #from cursas.extract import generate_full_run_table
 #generate_full_run_table('eastville')

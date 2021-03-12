@@ -18,7 +18,7 @@ class RunEvent():
         self.date = dt.date(year=int(date_string[2]), month=int(date_string[1]), day=int(date_string[0]))
 
 class ResultEntry():
-    athelete_link_preamble_length = len("athletehistory?athleteNumber=")
+    athlete_link_preamble_length = len("athletehistory?athleteNumber=")
 
     def __init__(self, row_data, run_name, event_id):
         #print(row_data.prettify())
@@ -39,7 +39,7 @@ class ResultEntry():
         if detailed_name is not None:
             ath_link_item = detailed_name.find("a")
             if ath_link_item is not None:
-                self.athlete_id = ath_link_item['href'][ResultEntry.athelete_link_preamble_length:]
+                self.athlete_id = ath_link_item['href'][ResultEntry.athlete_link_preamble_length:]
                 try:
                     self.athlete_id = int(self.athlete_id)
                 except ValueError: 

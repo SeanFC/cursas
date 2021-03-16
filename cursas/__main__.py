@@ -5,6 +5,8 @@ import dash
 
 
 from cursas.visualise import build_full_app, build_dev_app
+from cursas.extract import pull_db
+from cursas.config import get_config
 
 #from scss.compiler import Compiler
 #compiler = Compiler()
@@ -14,6 +16,12 @@ from cursas.visualise import build_full_app, build_dev_app
 #with open("assets/style.css", "w") as out_file:
 #    out_file.write("/* This is a machine generated file, changes may be overwritten */")
 #    out_file.write(convert)
+
+
+if (len(sys.argv) > 1) and (sys.argv[1] == 'pull'):
+    pull_db(get_config())
+    exit()
+
 
 
 app = dash.Dash(
@@ -27,7 +35,7 @@ app = dash.Dash(
 
 
 if (len(sys.argv) > 1) and (sys.argv[1] == 'dev'):
-    app = build_dev_app(app)
+    app = build_dev_app(app, get_config())
 else:
     app = build_full_app(app)
 

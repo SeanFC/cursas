@@ -19,6 +19,8 @@ import scipy.stats as st
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
                                                                                           
 from cursas.extract import CursasDatabase
 
@@ -50,40 +52,28 @@ class YearlyAverageTimePlot(CachedStatFigure):
         super().__init__(database, 'yearly_average_time_stats.csv') 
 
     def create_statistics_table(self):
-        with open(full_table_file_name, 'rb') as f:  
-            all_events, all_rows = pkl.load(f)
-        
-        data_table = np.array([
-            [int(row.time), int(row.event_id)] for row in all_rows if (row.athlete_id != -1)
-            ])
+        events_df = self.database.get_all_run_events()
+        results = self.database.get_all_results().merge(events_df, how='outer', left_on='Event ID', right_index=True).dropna()[['Date', 'Time']]
+        results = results.groupby('Date').mean('Time')
+        results.reset_index(inplace=True)
 
-        event_ids = np.unique(data_table[:, 1])
-        event_date_lookup = dict( (x.event_id, x.date) for x in all_events)
+        results['Day of Year'] = results['Date'].apply(lambda x: (x.date()-dt.date(x.year,1,1)).days)
+        results['Year'] = results['Date'].apply(lambda x: x.date().year)
 
-        #TODO: Not a great way to make this dataframe
-        avg_times = []
-        for e_id in event_ids:
-            cur_times = np.array(data_table[data_table[:, 1] == e_id][:, 0], dtype=float)
-            cur_times[cur_times <= 7*60] = np.nan
-            avg_times.append([
-                str(event_date_lookup[f'{e_id}'].year), # Cast to string here makes the plotting of the scatter separate into different groups
-                (event_date_lookup[f'{e_id}'] - dt.date(event_date_lookup[f'{e_id}'].year, 1, 1)).days, 
-                event_date_lookup[f'{e_id}'].strftime('%d %B %Y'), 
-                np.nanmean(cur_times)/60,
-                np.nanmin(cur_times)/60
-                ])
-        avg_times = np.array(avg_times)
-
-        return pd.DataFrame(avg_times, columns=['Event Year', 'Day of Year', 'Event Date', 'Mean Time', 'Min Time'])
-
+        return results
+       
     def get_figure(self):
-        fig = px.scatter(df, x='Day of Year', y='Mean Time', color='Event Year', hover_name='Event Date') 
+        data = self.get_statistics()
+        data['Time'] = data['Time']/60
+        data['Year'] = data['Year'].astype(str)
+
+        fig = px.scatter(data, x='Day of Year', y='Time', color='Year', hover_name='Date') #TODO: Year colours aren't great
 
         month_lengths = np.array([ monthrange(2011, month_idx)[1] for month_idx in range(1,13)])
 
         #TODO: Can't get these axis labels to be in the middle of the months
         fig.update_layout(
-            title="Average Eastville Parkrun times",
+            title="Average Parkrun results",
             xaxis = dict(
                 tickmode='array',
                 tickvals=np.array([0, *np.cumsum(month_lengths[:-1])]),# + month_lengths/2,
@@ -95,8 +85,6 @@ class YearlyAverageTimePlot(CachedStatFigure):
         ) 
 
         return fig
-
-
 
 #TODO: Delete this function if integrated into a class
 def plot_yearly_average_time():
@@ -166,7 +154,6 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
             'Women': women_hist,
             })
 
-
     def get_figure(self):
         fig = px.bar(self.get_statistics(), x='Time', y=['Men', 'Women']) 
 
@@ -219,6 +206,37 @@ def plot_runner_time_distribution():
         
     return fig
 
+class OverallRunAmountsPlot(CachedStatFigure):
+    def __init__(self, database):
+        super().__init__(database, 'overall_run_amounts.csv') 
+
+    def create_statistics_table(self):
+        results = self.database.get_all_results()#.groupby('Event ID').count()['Time']
+        run_amounts = results['Athlete ID'].value_counts()
+        bins = np.arange(1, run_amounts.max()+1)
+
+        hist, _ = np.histogram(run_amounts, bins=bins)
+        out_df = pd.DataFrame({
+            'Completed Runs': bins[:-1],
+            'Number of Runners': hist,
+            })
+        out_df.set_index('Completed Runs')
+        return out_df
+
+    def get_figure(self):
+        data = self.get_statistics()
+        fig = px.bar(data, x='Completed Runs', y='Number of Runners', log_y=True, range_y=[1, data['Number of Runners'].max()])
+
+        for shirt_val in [50, 100, 250, 500]:
+            if data['Completed Runs'].max()*1.1 > shirt_val:
+                fig.add_vline(x=shirt_val)
+
+        fig.update_layout(
+            title="Distribution of Runners That Completed a Number of Runs"
+            )
+
+        return fig
+
 def plot_overall_run_amounts():
     with open(full_table_file_name, 'rb') as f:  
         all_events, all_rows = pkl.load(f)
@@ -248,48 +266,42 @@ def plot_overall_run_amounts():
 
     return fig
 
-def plot_attendance():
-    with open(full_table_file_name, 'rb') as f:  
-        all_events, all_rows = pkl.load(f)
+#TODO: Too much data in this plot
+class AverageAttendancePlot(CachedStatFigure):
+    def __init__(self, database):
+        super().__init__(database, 'average_attendance.csv') 
 
-    #TODO: Not a very clean way to do this
-    event_ids = np.array([ int(row.event_id) for row in all_rows ])
-    df = pd.DataFrame([{
-        'Event ID':int(cur_id),
-        'Attendance':np.count_nonzero(event_ids == cur_id)
-        }
-        for cur_id in np.unique(event_ids)
-        ])
+    #TODO: Dropping nan means problem in dataset
+    #TODO: Replace the Run ID with the run name
+    def create_statistics_table(self):
+        events_df = self.database.get_all_run_events()
+        attendance = self.database.get_all_results().groupby('Event ID').count()['Time']
 
-    import datetime as dt
-    date_df = pd.DataFrame([{
-        'Event ID':int(cur_event.event_id),
-        'Time':(cur_event.date - dt.date(cur_event.date.year, 1, 1)).days,
-        'Year':cur_event.date.year
-        }
-        for cur_event in all_events
-        ])
-    df = df.merge(date_df, on='Event ID')
-    df.set_index('Event ID', inplace=True)
+        event_tracks = events_df.merge(attendance, how='outer', left_index=True, right_index=True)
+        event_tracks = event_tracks.merge(
+                events_df.groupby('Run ID').min().rename(columns={'Date':'First Event'}),
+                how='outer', left_on='Run ID', right_index=True
+                )
+        event_tracks['Days since start'] = event_tracks['Date'] - event_tracks['First Event']
+        event_tracks['Days since start'] = event_tracks['Days since start'].astype(int)/60/60/24*1e-9
+        del event_tracks['Date']
+        del event_tracks['First Event']
+        event_tracks.rename(columns={'Time':'Attendance'}, inplace=True)
 
-    fig = px.line(df, x='Time', y='Attendance', color='Year') #Note: Should probably be a bar chart really
+        return event_tracks
+        
+    def get_figure(self):
+        data = self.get_statistics()
+        fig = px.line(data, x='Days since start', y='Attendance', color='Run ID', log_y=True) #Note: Should probably be a bar chart really
 
-    month_lengths = np.array([ monthrange(2011, month_idx)[1] for month_idx in range(1,13)])
-
-    #TODO: Order these by event in the year so that each year can be compared together
-    #TODO: Can't get these axis labels to be in the middle of the months
-    fig.update_layout(
-        title="Attendance at Eastville Parkrun",
-        xaxis = dict(
-            tickmode='array',
-            tickvals=np.array([0, *np.cumsum(month_lengths[:-1])]),# + month_lengths/2,
-            ticktext=month_name[1:],
-            showgrid=True,
-            gridcolor='white',
-        ),
-        yaxis=dict(showgrid=False),
-    ) 
-    return fig
+        #TODO: Order these by event in the year so that each year can be compared together
+        #TODO: Can't get these axis labels to be in the middle of the months
+        fig.update_layout(
+            title="Attendance at Parkruns",
+            yaxis=dict(showgrid=False),
+        ) 
+        fig.update_yaxes(range=[10, None])
+        return fig
 
 def plot_single_performance():
     subject_name = 'Sean CLEATOR'
@@ -345,92 +357,119 @@ def plot_single_performance():
 
     return fig
 
-def plot_overall_attendance_and_events():
-    with open(full_table_file_name, 'rb') as f:  
-        all_events, all_rows = pkl.load(f)
+class OverallAttendanceEventsPlot(CachedStatFigure):
+    def __init__(self, database):
+        super().__init__(database, 'attendance_and_events_overall.csv') 
 
-    #TODO: Not a very clean way to do this
-    event_ids = np.array([ int(row.event_id) for row in all_rows ])
-    df = pd.DataFrame([{
-        'Event ID':int(cur_id),
-        'Attendance':np.count_nonzero(event_ids == cur_id)
-        }
-        for cur_id in np.unique(event_ids)
-        ])
+    def create_statistics_table(self):
+        #TODO:Dropping na here means we're dropping good debugging information. Lots of these events should have more runners.
+        events_df = self.database.get_all_run_events()
+        results = self.database.get_all_results().merge(events_df, how='outer', left_on='Event ID', right_index=True).dropna() 
 
-    date_df = pd.DataFrame([{
-        'Event ID':int(cur_event.event_id),
-        'Time':cur_event.date,#(cur_event.date - dt.date(cur_event.date.year, 1, 1)).days,
-        }
-        for cur_event in all_events
-        ])
-    df = df.merge(date_df, on='Event ID')
-    df.set_index('Event ID', inplace=True)
-    df['Number of Events'] = np.argsort(df['Time'])
+        out_df = results.groupby(['Date']).count().merge(events_df.groupby(['Date']).count(), how='outer', left_on='Date', right_on='Date')
+        out_df = out_df[['Athlete ID', 'Run ID_y']].dropna().sort_values('Date')
+        out_df.rename(columns={'Athlete ID':'Attendance', 'Run ID_y':'Races Run'}, inplace=True)
 
-    fig = px.line(df, x='Time', y=['Attendance', 'Number of Events']) #Note: Should probably be a bar chart really
+        return out_df
 
-    fig.update_xaxes(
-            rangeslider_visible=True,
-            rangeselector=dict(
-                buttons=list([
-                    dict(count=1, label="1m", step="month", stepmode="backward"),
-                    dict(count=6, label="6m", step="month", stepmode="backward"),
-                    dict(count=1, label="YTD", step="year", stepmode="todate"),
-                    dict(count=1, label="1y", step="year", stepmode="backward"),
-                    dict(step="all")
-                    ])
+    def get_figure(self):
+        # Create figure with secondary y-axis
+        data = self.get_statistics()
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        #x_axis_vals = df['Time']
+        fig.add_trace(go.Scatter(x=data['Date'], y=data['Attendance'], name="Attendance"), secondary_y=False)
+        fig.add_trace(go.Scatter(x=data['Date'], y=data['Races Run'], name="Races Run"), secondary_y=True)
+
+        fig.update_layout(
+                title="Attendances and number of events at Parkrun",
+                xaxis=dict(
+                    title='Time',
+                    rangeslider_visible=True,
+                    rangeselector=dict(
+                        buttons=list([
+                            dict(count=6, label="6m", step="month", stepmode="backward"),
+                            dict(count=1, label="YTD", step="year", stepmode="todate"),
+                            dict(count=1, label="1y", step="year", stepmode="backward"),
+                            dict(count=5, label="5y", step="year", stepmode="backward"),
+                            dict(step="all")
+                            ])
+                        )
+                    ),
+                yaxis=dict(title='Attendance'),
+                yaxis2=dict(title='Races Run'),
                 )
-            )
 
-    return fig
+        return fig
 
-def plot_runner_groups_avg_fast_scatter():
-    with open(full_table_file_name, 'rb') as f:  
-        all_events, all_rows = pkl.load(f)
-
-    all_row_info = np.empty((len(all_rows), 3), dtype=np.object)
-    for row_idx, row in enumerate(all_rows): 
-        #TODO: Junior excluded here
-        #TODO: Don't know what C age group is? 
-        if (row.athlete_id != -1) and (row.age_group != '') and ('J' not in row.age_group) and (row.age_group[2] != 'C'):
-            #TODO: The separation between age group and gender should happen at the DB creation stage
-            all_row_info[row_idx] = [
-                    row.time/60, 
-                    'Men' if row.age_group[1] == 'M' else 'Women', 
-                    row.age_group[2:]
-                    ]
-
-    df = pd.DataFrame(all_row_info, columns=['Time', 'Sex', 'Age Group']) # Note that None rows are automatically ignored
-    df = df[df['Time']>3].dropna() #TODO: Clean up at data input stage
-    df['Time'] = pd.to_numeric(df['Time'])
-
-    stats_df = df.groupby(['Sex', 'Age Group']).agg([
-        'min',
-        'mean', #TODO: Maybe median is better?
-        'count'
-        ]) 
-
-    # Get rid of multi indices and columns
-    stats_df = stats_df.reset_index()
-    stats_df.columns = stats_df.columns.map(lambda x:x[0] if x[1] == '' else x[1])
-    stats_df = stats_df.rename(columns={
-        'min':'Fastest', 
-        'mean':'Average', #TODO: Maybe median is better?
-        'count':'Number of Records'
-        })
-    stats_df = stats_df[stats_df['Number of Records'] > 5] #TODO: Should include all information, create a better plot 
+class RunnerGroupsPlot(CachedStatFigure):
+    def __init__(self, database, data_file_name='runner_groups_avg_fast.csv'):
+        super().__init__(database, data_file_name) 
+        self.title = "Average and Fastest Times for Groups of Runners"
     
-    fig = px.scatter(stats_df, x='Average', y='Fastest', size='Number of Records', color='Sex', hover_data=['Age Group']) #TODO: Need minute bins
+    def get_useable_results(self):
+        results = self.database.get_all_results()[['Time', 'Athlete ID']]
+        athletes = self.database.get_all_athletes()[['Sex', 'Age Group']]
+        results = results.merge(athletes, how='outer', left_on='Athlete ID', right_index=True).dropna()
+        del results['Athlete ID']
+        results['Time'] = pd.to_numeric(results['Time'])
 
-    fig.update_layout(
-        title="Average and Fastest Times for Groups of Runners",
-        xaxis_title="Average Time (minutes)",
-        yaxis_title="Fastest Time (minutes)",
-    )
+        return results
 
-    return fig
+    def create_statistics_table(self):
+        stats_df = self.get_useable_results().groupby(['Sex', 'Age Group']).agg([
+            'min',
+            'mean', #TODO: Maybe median is better?
+            'count'
+            ]) 
 
+        # Get rid of multi indices and columns
+        stats_df = stats_df.reset_index()
+        stats_df.columns = stats_df.columns.map(lambda x:x[0] if x[1] == '' else x[1])
+        stats_df = stats_df.rename(columns={
+            'min':'Fastest', 
+            'mean':'Average', #TODO: Maybe median is better?
+            'count':'Number of Records'
+            })
+        stats_df = stats_df[stats_df['Number of Records'] > 5] #TODO: Should include all information, create a better plot 
+        return stats_df
+                
+    def get_figure(self):
+        data = self.get_statistics()
+        data['Average']/=60
+        data['Fastest']/=60
+        fig = px.scatter(data, x='Average', y='Fastest', size='Number of Records', color='Sex', hover_data=['Age Group']) 
+
+        fig.update_layout(
+            title=self.title,
+            xaxis_title="Average Time (minutes)",
+            yaxis_title="Fastest Time (minutes)",
+        )
+
+        return fig
+
+class RunnerGroupsYearPlot(RunnerGroupsPlot):
+    def __init__(self, database):
+        super().__init__(database, data_file_name='runner_groups_avg_fast.csv')
+        self.title = "Average and Fastest Times for Groups of Runners for the last Year"
+
+    def get_useable_results(self):
+        results = self.database.get_all_results()[['Time', 'Athlete ID', 'Event ID']]
+        athletes = self.database.get_all_athletes()[['Sex', 'Age Group']]
+        events = self.database.get_all_run_events()
+
+        results = results.merge(athletes, how='outer', left_on='Athlete ID', right_index=True).dropna()
+        del results['Athlete ID']
+        results = results.merge(events, how='outer', left_on='Event ID', right_index=True).dropna()
+
+        cutoff_date = results['Date'].max()
+        cutoff_date = cutoff_date - pd.Timedelta("366 day")
+        results = results[results['Date'] > cutoff_date]
+
+        results['Time'] = pd.to_numeric(results['Time']) #TODO: Is this line needed (also repeat in child function)
+
+        return results[['Sex', 'Age Group', 'Time']]
+    
 #TODO: Very similar to plot above
 def plot_runner_groups_avg_fast_scatter_12_month():
     with open(full_table_file_name, 'rb') as f:  
@@ -539,7 +578,7 @@ def get_navbar():
                 ]
             )
 
-def get_overview_tab():
+def get_overview_tab(database):
     return [dcc.Markdown('''
     # Explore Parkun UK data
 
@@ -555,33 +594,36 @@ def get_overview_tab():
 
     Look at how Parkrun has grown from an initial group of runners to an international event.
     '''),
-    dcc.Graph(figure=plot_overall_attendance_and_events()),
+    dcc.Graph(figure=OverallAttendanceEventsPlot(database).get_figure()),
     ]
 
-def get_average_event_tab():
+def get_average_event_tab(database):
     return [
             dcc.Markdown('## Statistics of an Average Event'),
-            dcc.Graph(figure=plot_yearly_average_time()),
-            dcc.Graph(figure=plot_attendance()),
-            dcc.Graph(figure=plot_overall_run_amounts()),
+            dcc.Graph(figure=YearlyAverageTimePlot(database).get_figure()),
+            dcc.Graph(figure=AverageAttendancePlot(database).get_figure()),
+            dcc.Graph(figure=OverallRunAmountsPlot(database).get_figure()),
             ]
 
-def get_average_runner_tab():
+def get_average_runner_tab(database):
     return [
             dcc.Markdown('## Statistics of a Typical Runner'),
-            dcc.Graph(figure=plot_runner_time_distribution()), #TODO: Do for whole dataset and allow filtering?
-            dcc.Graph(figure=plot_runner_groups_avg_fast_scatter()),
-            dcc.Graph(figure=plot_runner_groups_avg_fast_scatter_12_month()),
-            dcc.Graph(figure=plot_single_performance()), #TODO: Move to single runner lookup tab
+            dcc.Graph(figure=RunnerTimeDistributionPlot(database).get_figure()), 
+            dcc.Graph(figure=RunnerGroupsPlot(database).get_figure()),
+            dcc.Graph(figure=RunnerGroupsYearPlot(database).get_figure()),
+            #dcc.Graph(figure=plot_single_performance()), #TODO: Move to single runner lookup tab
             ]
 
-def get_event_comparison_tab():
+def get_event_comparison_tab(database):
     return [
             dcc.Markdown('## Compare Different Events'),
-            dcc.Graph(figure=plot_event_avg_time_and_runners_12_month()),
+            dcc.Markdown('TODO: make plot_event_avg_time_and_runners_12_month'),
+            #dcc.Graph(figure=plot_event_avg_time_and_runners_12_month()),
             ]
 
-def build_full_app(app):
+def build_full_app(app, config):
+    database = CursasDatabase(config)
+
     #TODO: Tabs don't change colour on hover
     #TODO: Rather than setting these options for every tab it would probably be better to set some of them for the whole tabs structure
     default_tab_style = {
@@ -596,24 +638,26 @@ def build_full_app(app):
     unselected_tab_style = {**default_tab_style, 'background-color': '#333'}
     selected_tab_style = {**default_tab_style, 'background-color': '#3275c8'}
 
+
+
     app.layout = html.Div(className="grid-container", children=[
         html.Div(className="main", children=[
             html.Div(className="header", children=[
                 get_navbar(),
                 dcc.Tabs([
-                    dcc.Tab(label='Overview', children=get_overview_tab(),
+                    dcc.Tab(label='Overview', children=get_overview_tab(database),
                         style=unselected_tab_style,
                         selected_style=selected_tab_style
                         ),
-                    dcc.Tab(label='Average Event', children=get_average_event_tab(),
+                    dcc.Tab(label='Average Event', children=get_average_event_tab(database),
                         style=unselected_tab_style,
                         selected_style=selected_tab_style
                         ),
-                    dcc.Tab(label='Average Runner', children=get_average_runner_tab(),
+                    dcc.Tab(label='Average Runner', children=get_average_runner_tab(database),
                         style=unselected_tab_style,
                         selected_style=selected_tab_style
                         ),
-                    dcc.Tab(label='Event Comparison', children=get_event_comparison_tab(),
+                    dcc.Tab(label='Event Comparison', children=get_event_comparison_tab(database),
                         style=unselected_tab_style,
                         selected_style=selected_tab_style
                         ),
@@ -627,7 +671,7 @@ def build_full_app(app):
     return app
 
 def build_dev_app(app, config):
-    dev_figure_class = RunnerTimeDistributionPlot(
+    dev_figure_class = RunnerGroupsYearPlot(
             CursasDatabase(config)
             )
 

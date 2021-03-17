@@ -37,7 +37,7 @@ app = dash.Dash(
 if (len(sys.argv) > 1) and (sys.argv[1] == 'dev'):
     app = build_dev_app(app, get_config())
 else:
-    app = build_full_app(app)
+    app = build_full_app(app, get_config())
 
 application = app.server
 app.run_server(debug=True, use_reloader=True)  

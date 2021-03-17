@@ -154,11 +154,11 @@ class CursasDatabase():
         self.results_table_file = self.data_dir + 'results.csv'
 
     def full_database_refresh(self, pull_config, regrab=False):
-        #self.refresh_event_names(pull_config, regrab)
+        self.refresh_event_names(pull_config, regrab)
 
         #TODO: DB elements being generated
-        #self.generate_simulated_run_events() 
-        #self.generate_simulated_athletes() 
+        self.generate_simulated_run_events() 
+        self.generate_simulated_athletes() 
         self.generate_simulated_results()
 
     def refresh_event_names(self, pull_config, regrab=False):
@@ -186,6 +186,9 @@ class CursasDatabase():
         # Remove junior races
         junior_rows = event_name_table.apply(lambda row: 'junior' in row['Display Name'], axis=1)
         event_name_table = event_name_table[~junior_rows]
+
+        # Remove any duplicates. There can often be duplicates in the data source 
+        event_name_table = event_name_table.drop_duplicates()
 
         event_name_table.to_csv(self.event_table_file)
 
@@ -237,9 +240,8 @@ class CursasDatabase():
                             } for days_since_start in possible_days_since_start
                         ],
                     )
-
+        run_events_table.reset_index(drop=True, inplace=True)
         run_events_table.to_csv(self.run_event_table_file)
-
 
     #TODO: The idea of having an athlete table doesn't really work since people can change age, gender and name
     def generate_simulated_athletes(self):

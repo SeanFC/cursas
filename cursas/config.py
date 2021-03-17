@@ -13,6 +13,7 @@ class CursasConfig():
         self.run_ids_file_name = self.data_dir + config['database']['run_ids_file_name']
         self.full_table_file_name = self.data_dir + config['database']['full_table_file_name']
 
+        #TODO: Need to be able to accept configs where the [pull] section isn't filled in
         self.user_agent = config['pull']['user_agent']
         self.external_website_db = config['pull']['external_website_db']
 

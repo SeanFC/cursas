@@ -601,7 +601,7 @@ def get_average_event_tab(database):
     return [
             dcc.Markdown('## Statistics of an Average Event'),
             dcc.Graph(figure=YearlyAverageTimePlot(database).get_figure()),
-            dcc.Graph(figure=AverageAttendancePlot(database).get_figure()),
+            #dcc.Graph(figure=AverageAttendancePlot(database).get_figure()), #TODO: This figure takes too long to load
             dcc.Graph(figure=OverallRunAmountsPlot(database).get_figure()),
             ]
 

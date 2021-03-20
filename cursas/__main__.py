@@ -22,8 +22,6 @@ if (len(sys.argv) > 1) and (sys.argv[1] == 'pull'):
     pull_db(get_config())
     exit()
 
-
-
 app = dash.Dash(
         title='Cursas',
         url_base_pathname='/cursas/',

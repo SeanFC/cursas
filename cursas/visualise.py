@@ -173,18 +173,17 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
         #TODO: Unnamed: 0 column name
         data = self.get_statistics()
 
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=x, y=y,
-            text=y,
-            textposition='auto',
-        )])
-        fig = px.bar(data, x='Time', y=['Men', 'Women'], hover_data=data) 
+        #fig = go.Figure()
+        #fig.add_trace(go.Bar(
+        #    x=x, y=y,
+        #    text=y,
+        #    textposition='auto',
+        #)])
+        #TODO: Hover doesn't work well for this plot
+        fig = px.bar(data, x='Time', y=['Men', 'Women'])
 
         step_size = 1 #TODO: This assumes step size
         hist_group_boundries = np.arange(data['Time'].min(), data['Time'].max()+step_size, step_size) 
-        print(hist_group_boundries)
-        print(data.dtypes)
 
         fig.update_layout(
             title="Distribution of Times for Adult Runners",
@@ -199,11 +198,8 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
             barmode='overlay'
         )
         fig.update_traces(opacity=0.75)
-        #fig.show()
             
         return fig
-
-        pass
 
 class OverallRunAmountsPlot(CachedStatFigure):
     def __init__(self, database):

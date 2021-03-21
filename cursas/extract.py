@@ -192,6 +192,9 @@ class CursasDatabase():
 
         event_name_table.to_csv(self.event_table_file)
 
+    def get_all_events(self):
+        return pd.read_csv(self.event_table_file, index_col=0)
+
     def get_all_event_ids(self):
         return pd.read_csv(self.event_table_file, index_col=0).index.tolist()
 

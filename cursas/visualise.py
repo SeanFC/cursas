@@ -1,7 +1,8 @@
 #TODO: Add record times (world record and PR record) to relevant plots
 #TODO: Sex and gender naming mixing 
 #TODO: Add a demographics plot (the distributions of age and sex)
-#TODO: Uneven colour schemes
+#TODO: Red blue colour scheme doesn't really go with the rest of the website. Need a different accent colour than red.
+#TODO: Need some explanation text of under all the plots
 
 import random
 import time
@@ -109,23 +110,24 @@ class YearlyAverageTimePlot(CachedStatFigure):
         data['Time'] = data['Time']/60
         data['Year'] = data['Year'].astype(str)
 
+        colour_scheme = px.colors.sequential.Bluered
+       
+        #Note: The function to create colours wont work for any given colour scheme because the below will only work for rgb(r,g,b) colour strings, not other colour specification types.
         colours = { 
-                str(y):px.colors.label_rgb(col)
+                str(y):col
                 for y, col in zip(
                     np.arange(int(data['Year'].min()), int(data['Year'].max())+1), 
                     px.colors.n_colors(
-                        px.colors.hex_to_rgb(px.colors.sequential.Plasma[0]), 
-                        px.colors.hex_to_rgb(px.colors.sequential.Plasma[-1]),
+                        colour_scheme[0], 
+                        colour_scheme[-1],
                         n_colors=int(data['Year'].max()) - int(data['Year'].min())+1, 
-                        colortype='hex')
+                        colortype='rgb')
                     ) 
                 }
 
         fig = px.scatter(data, x='Day of Year', y='Time', color='Year', hover_name='Date', 
-                #color_discrete_sequence=colours
                 color_discrete_map = colours,
-                #continuous_color_scale="Viridis",#px.colors.sequential.Viridis
-                ) #TODO: Year colours aren't great
+                )
 
         month_lengths = np.array([monthrange(2011, month_idx)[1] for month_idx in range(1,13)])
 
@@ -154,27 +156,48 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
         athletes = self.database.get_all_athletes()[['Sex']]
         results = results.merge(athletes, how='outer', left_on='Athlete ID', right_index=True).dropna()
 
-        time_edges = np.arange(0, 60*90, 60)
-        men_hist, edges = np.histogram(results[results['Sex'] == 'M']['Time'], bins=time_edges)
-        women_hist, edges = np.histogram(results[results['Sex'] == 'W']['Time'], bins=time_edges)
-
-        return pd.DataFrame({
-            'Time':edges[:-1], #TODO: This should say the groups
+        time_edges = np.arange(0, 60*90, 60)/60
+        men_hist, edges = np.histogram(results[results['Sex'] == 'M']['Time']/60, bins=time_edges)
+        women_hist, edges = np.histogram(results[results['Sex'] == 'W']['Time']/60, bins=time_edges)
+        
+        out_df = pd.DataFrame({
+            'Time': edges[:-1],
             'Men': men_hist,
             'Women': women_hist,
             })
+        out_df = out_df[(out_df['Men'] > 0) | (out_df['Women'] > 0)] #TODO: This approach wont deal well with outliers
+
+        return out_df
 
     def get_figure(self):
-        fig = px.bar(self.get_statistics(), x='Time', y=['Men', 'Women']) 
+        #TODO: Unnamed: 0 column name
+        data = self.get_statistics()
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=x, y=y,
+            text=y,
+            textposition='auto',
+        )])
+        fig = px.bar(data, x='Time', y=['Men', 'Women'], hover_data=data) 
+
+        step_size = 1 #TODO: This assumes step size
+        hist_group_boundries = np.arange(data['Time'].min(), data['Time'].max()+step_size, step_size) 
+        print(hist_group_boundries)
+        print(data.dtypes)
 
         fig.update_layout(
             title="Distribution of Times for Adult Runners",
             xaxis_title="Time (minutes)",
             yaxis_title="Amount of Times Registered",
             legend_title="Sex",
+            xaxis=dict(
+                tickmode='array',
+                tickvals=hist_group_boundries - step_size/2,
+                ticktext=list(map(lambda x:str(int(x)), hist_group_boundries)),
+                ),
+            barmode='overlay'
         )
-
-        fig.update_layout(barmode='overlay')
         fig.update_traces(opacity=0.75)
         #fig.show()
             
@@ -220,9 +243,11 @@ class AverageAttendancePlot(CachedStatFigure):
 
     #TODO: Dropping nan means problem in dataset
     def create_statistics_table(self):
+        # Pull from database
         events_df = self.database.get_all_run_events()
         attendance = self.database.get_all_results().groupby('Event ID').count()['Time']
 
+        # Get a list of all the event runs with the data as how many days since the first event
         event_tracks = events_df.merge(attendance, how='outer', left_index=True, right_index=True)
         event_tracks = event_tracks.merge(
                 events_df.groupby('Run ID').min().rename(columns={'Date':'First Event'}),
@@ -240,36 +265,58 @@ class AverageAttendancePlot(CachedStatFigure):
                 np.nanstd,
                 'count'
                 ], axis=1).rename(columns={'<lambda>':'Mean Attendance', 'nanstd': 'Std Attendance'})
-        event_tracks = event_tracks[event_tracks['count'] >= 30] #TODO: This needs to be mentioned in the output/function name/title
-        event_tracks.rename(columns={'nangmean':'Mean Attendance', 'nanstd': 'Std Attendance'}, inplace=True)
-        event_tracks['Days since start'] = event_tracks.index
-        del event_tracks['count']
+        event_tracks = event_tracks[event_tracks['count'] >= 2] #TODO: This needs to be mentioned in the output/function name/title
+        event_tracks.rename(columns={'nangmean':'Mean Attendance', 'nanstd': 'Std Attendance', 'count':'Sample Size'}, inplace=True)
+        event_tracks['Days since start'] = event_tracks.index #TODO: This creates an Unnamed: 0 Column
 
         return event_tracks
         
     def get_figure(self):
         data = self.get_statistics()
 
-        fig = go.Figure()
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
         fig.add_trace(go.Scatter(
             x=data['Days since start'], 
             y=data['Mean Attendance'],
-            showlegend=False,
-            ))
+            name='Attendance'
+            ),
+            secondary_y=False
+            )
+
+        std_bound = np.array((data['Mean Attendance'] + data['Std Attendance']/2).tolist() + (data['Mean Attendance'] - data['Std Attendance']/2).tolist()[::-1])
+        std_bound = np.max(np.vstack((std_bound, [0]*len(std_bound))), axis=0)
 
         fig.add_trace(go.Scatter(
             x=data['Days since start'].tolist() + data['Days since start'].tolist()[::-1],
-            y=(data['Mean Attendance'] + data['Std Attendance']/2).tolist() + (data['Mean Attendance'] - data['Std Attendance']/2).tolist()[::-1],
+            y=std_bound,
             fill='toself',
-            showlegend=False,
-        ))
+            line_color='blue',
+            line_width=0,
+            name='Attendance Spread',
+            ), 
+            secondary_y=False
+            )
+
+        fig.add_trace(go.Scatter(
+            x=data['Days since start'],
+            y=data['Sample Size'],
+            name='Sample Size',
+            line_color='red',
+            ), 
+            secondary_y=True
+            )
 
         # X-axis should be by year
         fig.update_layout(
-            title="Attendance at Parkruns",
-            yaxis=dict(showgrid=False),
+            title="Average Attendance at Parkrun",
+            xaxis=dict(showgrid=True, title='Days Since Start'),
+            yaxis=dict(showgrid=True, title='Average Attendance'),
+            yaxis2=dict(title='Sample Size'),
+            hovermode='x unified',
+            showlegend=True
         ) 
         fig.update_yaxes(range=[10, None])
+
         return fig
 
 #TODO: This needs to go somewhere
@@ -399,27 +446,31 @@ class EventAvgYear(CachedStatFigure):
         super().__init__(database, 'event_avg_year.csv')
 
     def create_statistics_table(self):
-        events_df = self.database.get_all_run_events()
+        events = self.database.get_all_events()
+        run_events = self.database.get_all_run_events()
         results = self.database.get_all_results()
+
         run_event_stats = results[['Time', 'Event ID']].groupby('Event ID').agg(**{
                 'Attendance':pd.NamedAgg(column='Event ID', aggfunc='count'),
                 'Time':pd.NamedAgg(column='Time', aggfunc=np.mean)
                 })
-        run_event_stats = run_event_stats.merge(events_df, how='inner', left_on='Event ID', right_index=True)
+        run_event_stats = run_event_stats.merge(run_events, how='inner', left_on='Event ID', right_index=True)
 
         cutoff_date = run_event_stats['Date'].max()
         cutoff_date = cutoff_date - pd.Timedelta("366 day")
         run_event_stats = run_event_stats[run_event_stats['Date'] > cutoff_date]
         
-        #TODO: Change Run IDs to names
-        return run_event_stats[['Attendance', 'Time', 'Run ID']].groupby('Run ID').apply(np.mean)
+        out_df = run_event_stats[['Attendance', 'Time', 'Run ID']].groupby('Run ID').apply(np.mean)
+        return out_df.merge(events, how='inner', left_on='Run ID', right_index=True).rename(columns={'Display Name':'Event Display Name'})
 
     def get_figure(self):
         data = self.get_statistics()
         data['Time']/=60
 
-        fig = px.scatter(data, x='Attendance', y='Time', hover_name='Run ID', hover_data=data.columns,
-                marginal_x='histogram', marginal_y='histogram') 
+        fig = px.scatter(data, x='Attendance', y='Time', hover_name='Event Display Name', 
+                hover_data=['Attendance', 'Time'],
+                marginal_x='histogram', marginal_y='histogram'
+                ) 
 
         fig.update_layout(
             title="Different Runs Over the Last 12 Months",
@@ -509,10 +560,16 @@ def get_average_event_tab(database):
             ### Event Comparison
             '''),
             dcc.Graph(figure=EventAvgYear(database).get_figure()),
-            #TODO: Add inline sex ratio and age distribution scatter plot (y axis men/women ratio, x axis average age?)
+            #TODO: Add in-line sex ratio and age distribution scatter plot (y axis men/women ratio, x axis average age?)
             dcc.Markdown('### Typical Event'),
             dcc.Graph(figure=AverageAttendancePlot(database).get_figure()), 
-            dcc.Markdown('Note that the geometric mean is used here instead of the standard mean. This is to account for outliers such as very popular events.'),
+            dcc.Markdown('''
+            The geometric mean of the attendance at at event since the start of the event. 
+            Geometric mean is used here instead of the standard mean is to account for outliers such as very popular events.
+            
+            The spread is shown as one standard deviation around the mean.
+            The abrupt changes in spread are likely due to that fact that outlier events haven't run enough races rather than a change in likelihood of the mean being correct.
+            '''),
             ]
 
 def get_average_runner_tab(database):
@@ -574,7 +631,7 @@ def build_full_app(app, config):
     return app
 
 def build_dev_app(app, config):
-    dev_figure_class = AverageAttendancePlot(
+    dev_figure_class = RunnerTimeDistributionPlot(
             CursasDatabase(config)
             )
 

@@ -369,6 +369,7 @@ def plot_single_performance():
             )
 
     return fig
+
 class RunnerGroupsPlot(CachedStatFigure):
     def __init__(self, database, data_file_name='runner_groups_avg_fast.csv'):
         super().__init__(database, data_file_name) 
@@ -386,7 +387,7 @@ class RunnerGroupsPlot(CachedStatFigure):
     def create_statistics_table(self):
         stats_df = self.get_useable_results().groupby(['Sex', 'Age Group']).agg([
             'min',
-            'mean', #TODO: Maybe median is better?
+            'median', 
             'count'
             ]) 
 
@@ -395,16 +396,21 @@ class RunnerGroupsPlot(CachedStatFigure):
         stats_df.columns = stats_df.columns.map(lambda x:x[0] if x[1] == '' else x[1])
         stats_df = stats_df.rename(columns={
             'min':'Fastest', 
-            'mean':'Average', #TODO: Maybe median is better?
+            'median':'Average', 
             'count':'Number of Records'
             })
-        stats_df = stats_df[stats_df['Number of Records'] > 5] #TODO: Should include all information, create a better plot 
+
+        #TODO: Is it faster to do this with some thing like apply?
+        stats_df.loc[stats_df['Sex']=='M', 'Sex'] = 'Men' 
+        stats_df.loc[stats_df['Sex']=='W', 'Sex'] = 'Women'
+
+        stats_df['Average']/=60
+        stats_df['Fastest']/=60
+
         return stats_df
                 
     def get_figure(self):
         data = self.get_statistics()
-        data['Average']/=60
-        data['Fastest']/=60
         fig = px.scatter(data, x='Average', y='Fastest', size='Number of Records', color='Sex', hover_data=['Age Group']) 
 
         fig.update_layout(
@@ -551,7 +557,7 @@ def get_average_event_tab(database):
             ## Statistics of Events
 
             An event describes the location, management team, etc. that runs races on most Saturdays.
-            Use this page to compare all the different events against each other and understand what a typical event looks like statistically.
+            This page to compares all the different events against each other and shows what a typical event looks like statistically.
 
             ### Event Comparison
             '''),
@@ -573,12 +579,16 @@ def get_average_runner_tab(database):
             dcc.Markdown('''
             ## Statistics of Athletes 
             
-            Use this page to explore the demographics and race results of all the different athletes.
+            This page explores the demographics and race results of all the different athletes.
             
             '''),
             dcc.Graph(figure=RunnerTimeDistributionPlot(database).get_figure()), 
             #dcc.Graph(figure=RunnerGroupsPlot(database).get_figure()),
             dcc.Graph(figure=RunnerGroupsYearPlot(database).get_figure()),
+            dcc.Markdown('''
+            The average here is calculated as the median. 
+            This means 50% of run times were faster and 50% slower than this average.
+            '''),
             dcc.Graph(figure=OverallRunAmountsPlot(database).get_figure()),
             #dcc.Graph(figure=plot_single_performance()), #TODO: Move to single runner lookup tab
             ]
@@ -627,11 +637,11 @@ def build_full_app(app, config):
     return app
 
 def build_dev_app(app, config):
-    dev_figure_class = RunnerTimeDistributionPlot(
+    dev_figure_class = RunnerGroupsYearPlot(
             CursasDatabase(config)
             )
 
-    #dev_figure_class.create_statistics()
+    dev_figure_class.create_statistics()
 
     app.layout = html.Div(className="grid-container", children=[
         dcc.Graph(figure=dev_figure_class.get_figure())

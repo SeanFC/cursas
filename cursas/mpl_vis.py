@@ -11,14 +11,14 @@ def mpl_plot_single_run(race_entries):
 
 
 def plot_all_row_entry_times():
-    with open(full_table_file_name, 'rb') as f:  
+    with open(full_table_file_name, 'rb') as f:
         _, all_rows = pkl.load(f)
 
     data_table = np.array([
         [(row.time), 'M' in row.age_group, row.age_group] for row in all_rows if (row.athlete_id != -1)
         ])
     print(data_table)
-    
+
     age_groups = np.unique(data_table[:, 2])
     age_groups = [ g for g in age_groups if 'M' in g]
     sections = [
@@ -43,9 +43,9 @@ def plot_all_row_entry_times():
 
 def mpl_plot_yearly_average_time():
     #TODO: Some of the times of the last rows are being parse incorrectly
-    with open(full_table_file_name, 'rb') as f:  
+    with open(full_table_file_name, 'rb') as f:
         all_events, all_rows = pkl.load(f)
-    
+
     data_table = np.array([
         [int(row.time), int(row.event_id)] for row in all_rows if (row.athlete_id != -1)
         ])
@@ -59,7 +59,7 @@ def mpl_plot_yearly_average_time():
         cur_times[cur_times <= 7*60] = np.nan
 
         avg_times.append([
-            event_date_lookup[f'{e_id}'], 
+            event_date_lookup[f'{e_id}'],
             np.nanmean(cur_times),
             np.nanmin(cur_times)
             ])
@@ -75,7 +75,7 @@ def mpl_plot_yearly_average_time():
         avg_ax.scatter(dates_this_year, vals_this_year[:, 1]/60, label=year)
         min_ax.scatter(dates_this_year, vals_this_year[:, 2]/60, label=year)
 
-    from calendar import monthrange, month_name 
+    from calendar import monthrange, month_name
     month_lengths = [0]
     for month_idx in range(1,12):
         month_lengths.append(monthrange(2011, month_idx)[1])
@@ -87,7 +87,7 @@ def mpl_plot_yearly_average_time():
     fig.suptitle(all_events[0].run_name.title())
     avg_ax.set_ylabel('Average Parkrun Time (minutes)')
 
-    from calendar import monthrange, month_name 
+    from calendar import monthrange, month_name
     month_lengths = [0]
     for month_idx in range(1,12):
         month_lengths.append(monthrange(2011, month_idx)[1])
@@ -109,17 +109,17 @@ def mpl_plot_yearly_average_time():
 
 def mpl_time_hiso_plot(times, data_table):
     mean, median, mode = (np.mean(times), np.median(times), st.mode(list(map(lambda x:int(x), times)))[0][0])
-    
+
     fig, ax = plt.subplots(1,1)
     ax.hist(times, bins=np.arange(int(np.min(times)), int(np.max(times))+1))
     y_lims = ax.get_ylim()
 
     from matplotlib.offsetbox import AnchoredText
     anchored_text = AnchoredText(
-            'Mean: '+ str(round(mean, 2) ) + 'm\n' + 
+            'Mean: '+ str(round(mean, 2) ) + 'm\n' +
             'Median: '+ str(round(median, 2)) + 'm\n' +
             'Mode: '+ str(mode) + '-' + str(mode+1) + 'm'
-            , 
+            ,
             loc='upper right', frameon=False)
     ax.add_artist(anchored_text)
 

@@ -1,8 +1,8 @@
 import dash
 
-from cursas.visualise import build_full_app 
+from cursas.visualise import build_full_app
 
-from cursas.config import get_config
+from cursas.config import CursasConfig 
 
 app = dash.Dash(
         title='Cursas',
@@ -10,5 +10,5 @@ app = dash.Dash(
         #assets_folder='../assets'
         )
 
-app = build_full_app(app, get_config())
+app = build_full_app(app, CursasConfig())
 application = app.server

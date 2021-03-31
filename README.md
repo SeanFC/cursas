@@ -20,6 +20,17 @@ python -m cursas
 ```
 to generate the full website.
 
+### Alternate running modes
+
+For development a site with a single graph can be run with 
+```
+python -m curas dev 
+```
+and the database can be create/pulled with
+```
+python -m curas pull
+```
+
 ## Deploy
 
 Deployment requires a server running with:
@@ -34,11 +45,13 @@ The deploy command is then
 ```
 
 # TODO
+
 * Deploy still requires some server side setup
 * Lots of confusing config options
 * Need to use assets of wider website
 * Add a weekly update - how was this weeks event, how was this weeks park run overall (different demographics?), how did individuals do
 * Covid analysis
+* Install as command line program
 
 ## Contact
 Maintained by Sean F. Cleator

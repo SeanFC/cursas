@@ -1,43 +1,37 @@
-import sys
-import re 
+""" Main entry point for running Cursas from the command line. """
 
+# Standard library imports
+import sys
+import re
+
+# External imports
 import dash
 
-
+# Internal imports
 from cursas.visualise import build_full_app, build_dev_app
 from cursas.extract import pull_db
-from cursas.config import get_config
+from cursas.config import CursasConfig
 
-#from scss.compiler import Compiler
-#compiler = Compiler()
-#
-#convert = compiler.compile("assets/css/style.scss")
-#
-#with open("assets/style.css", "w") as out_file:
-#    out_file.write("/* This is a machine generated file, changes may be overwritten */")
-#    out_file.write(convert)
-
-
+# Pull the database
 if (len(sys.argv) > 1) and (sys.argv[1] == 'pull'):
-    pull_db(get_config())
-    exit()
+    pull_db(CursasConfig())
+    sys.exit()
 
+# Create the application
 app = dash.Dash(
         title='Cursas',
         url_base_pathname='/cursas/',
         assets_folder='../assets',
         assets_ignore=re.escape('*.scss'),
-        #assets_external_path='https://www.sfcleator.com/assets'
         meta_tags =[dict(name="viewport", content="width=device-width, initial-scale=1.0")]
         )
 
-
+# Add everything into the application
 if (len(sys.argv) > 1) and (sys.argv[1] == 'dev'):
-    app = build_dev_app(app, get_config())
+    app = build_dev_app(app, CursasConfig())
 else:
-    app = build_full_app(app, get_config())
+    app = build_full_app(app, CursasConfig())
 
-application = app.server
-app.run_server(debug=True, use_reloader=True)  
-#from cursas.extract import generate_full_run_table
-#generate_full_run_table('eastville')
+# Run the application and leave WSGI hook
+application = app.server # WSGI hook
+app.run_server(debug=True, use_reloader=True)

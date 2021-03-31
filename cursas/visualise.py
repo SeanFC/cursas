@@ -1,5 +1,5 @@
 #TODO: Add record times (world record and PR record) to relevant plots
-#TODO: Sex and gender naming mixing 
+#TODO: Sex and gender naming mixing
 #TODO: Add a demographics plot (the distributions of age and sex)
 #TODO: Red blue colour scheme doesn't really go with the rest of the website. Need a different accent colour than red.
 #TODO: Need some explanation text of under all the plots
@@ -8,7 +8,7 @@ import random
 import time
 import pickle as pkl
 import datetime as dt
-from calendar import monthrange, month_name 
+from calendar import monthrange, month_name
 from abc import ABC, abstractmethod
 import os.path as osp
 
@@ -21,7 +21,7 @@ import dash_html_components as html
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-                                                                                          
+
 from cursas.extract import CursasDatabase
 
 #TODO: Maybe this can be done with function decorators?
@@ -29,11 +29,11 @@ class CachedStatFigure(ABC):
     def __init__(self, database, given_fp):
         self.cache_file_path = database.data_dir + given_fp
         self.database = database
-    
+
     def get_statistics(self):
         if not osp.isfile(self.cache_file_path):
            raise RuntimeError('Statistics have never been generated')
-        
+
         return pd.read_csv(self.cache_file_path)
 
     def create_statistics(self):
@@ -42,19 +42,19 @@ class CachedStatFigure(ABC):
     @abstractmethod
     def create_statistics_table(self):
         pass
-    
+
     @abstractmethod
     def get_figure(self):
         pass
 
 class OverallAttendanceEventsPlot(CachedStatFigure):
     def __init__(self, database):
-        super().__init__(database, 'attendance_and_events_overall.csv') 
+        super().__init__(database, 'attendance_and_events_overall.csv')
 
     def create_statistics_table(self):
         #TODO:Dropping na here means we're dropping good debugging information. Lots of these events should have more runners.
         events_df = self.database.get_all_run_events()
-        results = self.database.get_all_results().merge(events_df, how='outer', left_on='Event ID', right_index=True).dropna() 
+        results = self.database.get_all_results().merge(events_df, how='outer', left_on='Event ID', right_index=True).dropna()
 
         out_df = results.groupby(['Date']).count().merge(events_df.groupby(['Date']).count(), how='outer', left_on='Date', right_on='Date')
         out_df = out_df[['Athlete ID', 'Run ID_y']].dropna().sort_values('Date')
@@ -92,7 +92,7 @@ class OverallAttendanceEventsPlot(CachedStatFigure):
 
 class YearlyAverageTimePlot(CachedStatFigure):
     def __init__(self, database):
-        super().__init__(database, 'yearly_average_time_stats.csv') 
+        super().__init__(database, 'yearly_average_time_stats.csv')
 
     def create_statistics_table(self):
         events_df = self.database.get_all_run_events()
@@ -104,28 +104,28 @@ class YearlyAverageTimePlot(CachedStatFigure):
         results['Year'] = results['Date'].apply(lambda x: x.date().year)
 
         return results
-       
+
     def get_figure(self):
         data = self.get_statistics()
         data['Time'] = data['Time']/60
         data['Year'] = data['Year'].astype(str)
 
         colour_scheme = px.colors.sequential.Bluered
-       
+
         #Note: The function to create colours wont work for any given colour scheme because the below will only work for rgb(r,g,b) colour strings, not other colour specification types.
-        colours = { 
+        colours = {
                 str(y):col
                 for y, col in zip(
-                    np.arange(int(data['Year'].min()), int(data['Year'].max())+1), 
+                    np.arange(int(data['Year'].min()), int(data['Year'].max())+1),
                     px.colors.n_colors(
-                        colour_scheme[0], 
+                        colour_scheme[0],
                         colour_scheme[-1],
-                        n_colors=int(data['Year'].max()) - int(data['Year'].min())+1, 
+                        n_colors=int(data['Year'].max()) - int(data['Year'].min())+1,
                         colortype='rgb')
-                    ) 
+                    )
                 }
 
-        fig = px.scatter(data, x='Day of Year', y='Time', color='Year', hover_name='Date', 
+        fig = px.scatter(data, x='Day of Year', y='Time', color='Year', hover_name='Date',
                 color_discrete_map = colours,
                 )
 
@@ -142,16 +142,16 @@ class YearlyAverageTimePlot(CachedStatFigure):
                 gridcolor='white',
             ),
             yaxis=dict(showgrid=False),
-        ) 
+        )
 
         return fig
 
 class RunnerTimeDistributionPlot(CachedStatFigure):
     def __init__(self, database):
-        super().__init__(database, 'runner_time_dist.csv') 
+        super().__init__(database, 'runner_time_dist.csv')
 
     def create_statistics_table(self):
-         
+
         results = self.database.get_all_results()[['Time', 'Athlete ID']]
         athletes = self.database.get_all_athletes()[['Sex']]
         results = results.merge(athletes, how='outer', left_on='Athlete ID', right_index=True).dropna()
@@ -159,7 +159,7 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
         time_edges = np.arange(0, 60*90, 60)/60
         men_hist, edges = np.histogram(results[results['Sex'] == 'M']['Time']/60, bins=time_edges)
         women_hist, edges = np.histogram(results[results['Sex'] == 'W']['Time']/60, bins=time_edges)
-        
+
         out_df = pd.DataFrame({
             'Time': edges[:-1],
             'Men': men_hist,
@@ -183,7 +183,7 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
         fig = px.bar(data, x='Time', y=['Men', 'Women'])
 
         step_size = 1 #TODO: This assumes step size
-        hist_group_boundries = np.arange(data['Time'].min(), data['Time'].max()+step_size, step_size) 
+        hist_group_boundries = np.arange(data['Time'].min(), data['Time'].max()+step_size, step_size)
 
         fig.update_layout(
             title="Distribution of Times for Adult Runners",
@@ -198,12 +198,12 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
             barmode='overlay'
         )
         fig.update_traces(opacity=0.75)
-            
+
         return fig
 
 class OverallRunAmountsPlot(CachedStatFigure):
     def __init__(self, database):
-        super().__init__(database, 'overall_run_amounts.csv') 
+        super().__init__(database, 'overall_run_amounts.csv')
 
     def create_statistics_table(self):
         results = self.database.get_all_results()#.groupby('Event ID').count()['Time']
@@ -235,7 +235,7 @@ class OverallRunAmountsPlot(CachedStatFigure):
 
 class AverageAttendancePlot(CachedStatFigure):
     def __init__(self, database):
-        super().__init__(database, 'average_attendance.csv') 
+        super().__init__(database, 'average_attendance.csv')
 
     #TODO: Dropping nan means problem in dataset
     def create_statistics_table(self):
@@ -266,13 +266,13 @@ class AverageAttendancePlot(CachedStatFigure):
         event_tracks['Days since start'] = event_tracks.index #TODO: This creates an Unnamed: 0 Column
 
         return event_tracks
-        
+
     def get_figure(self):
         data = self.get_statistics()
 
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         fig.add_trace(go.Scatter(
-            x=data['Days since start'], 
+            x=data['Days since start'],
             y=data['Mean Attendance'],
             name='Attendance'
             ),
@@ -289,7 +289,7 @@ class AverageAttendancePlot(CachedStatFigure):
             line_color='blue',
             line_width=0,
             name='Attendance Spread',
-            ), 
+            ),
             secondary_y=False
             )
 
@@ -298,7 +298,7 @@ class AverageAttendancePlot(CachedStatFigure):
             y=data['Sample Size'],
             name='Sample Size',
             line_color='red',
-            ), 
+            ),
             secondary_y=True
             )
 
@@ -310,7 +310,7 @@ class AverageAttendancePlot(CachedStatFigure):
             yaxis2=dict(title='Sample Size'),
             hovermode='x unified',
             showlegend=True
-        ) 
+        )
         fig.update_yaxes(range=[10, None])
 
         return fig
@@ -319,7 +319,7 @@ class AverageAttendancePlot(CachedStatFigure):
 def plot_single_performance():
     subject_name = 'Sean CLEATOR'
 
-    with open(full_table_file_name, 'rb') as f:  
+    with open(full_table_file_name, 'rb') as f:
         all_events, all_rows = pkl.load(f)
 
     #TODO: Not a very clean way to do this
@@ -372,9 +372,9 @@ def plot_single_performance():
 
 class RunnerGroupsPlot(CachedStatFigure):
     def __init__(self, database, data_file_name='runner_groups_avg_fast.csv'):
-        super().__init__(database, data_file_name) 
+        super().__init__(database, data_file_name)
         self.title = "Average and Fastest Times for Groups of Runners"
-    
+
     def get_useable_results(self):
         results = self.database.get_all_results()[['Time', 'Athlete ID']]
         athletes = self.database.get_all_athletes()[['Sex', 'Age Group']]
@@ -387,31 +387,31 @@ class RunnerGroupsPlot(CachedStatFigure):
     def create_statistics_table(self):
         stats_df = self.get_useable_results().groupby(['Sex', 'Age Group']).agg([
             'min',
-            'median', 
+            'median',
             'count'
-            ]) 
+            ])
 
         # Get rid of multi indices and columns
         stats_df = stats_df.reset_index()
         stats_df.columns = stats_df.columns.map(lambda x:x[0] if x[1] == '' else x[1])
         stats_df = stats_df.rename(columns={
-            'min':'Fastest', 
-            'median':'Average', 
+            'min':'Fastest',
+            'median':'Average',
             'count':'Number of Records'
             })
 
         #TODO: Is it faster to do this with some thing like apply?
-        stats_df.loc[stats_df['Sex']=='M', 'Sex'] = 'Men' 
+        stats_df.loc[stats_df['Sex']=='M', 'Sex'] = 'Men'
         stats_df.loc[stats_df['Sex']=='W', 'Sex'] = 'Women'
 
         stats_df['Average']/=60
         stats_df['Fastest']/=60
 
         return stats_df
-                
+
     def get_figure(self):
         data = self.get_statistics()
-        fig = px.scatter(data, x='Average', y='Fastest', size='Number of Records', color='Sex', hover_data=['Age Group']) 
+        fig = px.scatter(data, x='Average', y='Fastest', size='Number of Records', color='Sex', hover_data=['Age Group'])
 
         fig.update_layout(
             title=self.title,
@@ -461,7 +461,7 @@ class EventAvgYear(CachedStatFigure):
         cutoff_date = run_event_stats['Date'].max()
         cutoff_date = cutoff_date - pd.Timedelta("366 day")
         run_event_stats = run_event_stats[run_event_stats['Date'] > cutoff_date]
-        
+
         out_df = run_event_stats[['Attendance', 'Time', 'Run ID']].groupby('Run ID').apply(np.mean)
         return out_df.merge(events, how='inner', left_on='Run ID', right_index=True).rename(columns={'Display Name':'Event Display Name'})
 
@@ -469,19 +469,19 @@ class EventAvgYear(CachedStatFigure):
         data = self.get_statistics()
         data['Time']/=60
 
-        fig = px.scatter(data, x='Attendance', y='Time', hover_name='Event Display Name', 
+        fig = px.scatter(data, x='Attendance', y='Time', hover_name='Event Display Name',
                 hover_data=['Attendance', 'Time'],
                 marginal_x='histogram', marginal_y='histogram'
-                ) 
+                )
 
         fig.update_layout(
             title="Different Runs Over the Last 12 Months",
             xaxis_title="Average Attendance",
             yaxis_title="Average Time (minutes)",
         )
-        return fig 
-    
-#TODO: Move the below stuff to it's own module 
+        return fig
+
+#TODO: Move the below stuff to it's own module
 def get_navbar():
     return html.Ul(
             className="topnav",
@@ -497,7 +497,7 @@ def get_overview_tab(database):
     return [dcc.Markdown('''
     # Explore Simulated Parkrun Data
 
-    **[Parkrun](https://www.parkrun.com/)** is a series of free to enter 5 kilometre running races held weekly across the world. 
+    **[Parkrun](https://www.parkrun.com/)** is a series of free to enter 5 kilometre running races held weekly across the world.
     This website shows interactive analysis on a **[simulated](#simulated)** version of the finish times for these races.
 
     This website has no affiliation with Parkrun and so has no access to the real data however, if you think you could help change this please **[contact me](https://www.sfcleator.com/contact)**.
@@ -512,7 +512,7 @@ def get_overview_tab(database):
     Instead of using the real Parkrun data this project instead simulates completely fictional races, athletes and run times.
     The distributions of various aspects of the dataset (e.g. sex ratios, amount of races run etc.) are designed to mimic what I think would appear in the real dataset.
     However, the information of specific events or athletes isn't designed to match the real dataset and so any similarities are purely coincidental.
-    Note this is most relevant in the way that the event names may be similar to the real event names however, any specific data about these events isn't designed to match the real thing. 
+    Note this is most relevant in the way that the event names may be similar to the real event names however, any specific data about these events isn't designed to match the real thing.
 
     ### Why?
 
@@ -529,7 +529,7 @@ def get_overview_tab(database):
     3. A set of athletes are generated with a sex, age group, home event, typical result time, first participated event and number of event participations. The distribution of athlete attributes is selected to be a basic approximation of what is expected in the real data.
     4. For each athlete a result time is generated for a simulated list of run events that the athlete took part in. The time is randomly generated based on the athlete's attributes (age, typical result time, etc.). The list of run events is a random selection of the run events at the athlete's home event that the athlete could feasibly take part in (considering when their first event was and how many runs they've done.
 
-    This isn't the full process for how the dataset is created as additional steps are taken to ensure that unrealistic data doesn't creep in such as someone competing in two events as once. 
+    This isn't the full process for how the dataset is created as additional steps are taken to ensure that unrealistic data doesn't creep in such as someone competing in two events as once.
     Further, this is a very crude simulation of the real data and it is possible this simulation will improve in the future.
     Some of the bigger problems include:
 
@@ -538,7 +538,7 @@ def get_overview_tab(database):
     * Several of the distributions used are either unrealistic (e.g. the age groups are poorly distributed).
     * Features of the data such as result times and attendance don't take into account extra factors such as course difficulty or weather.
 
-    ### Can I see this analysis on the real data? 
+    ### Can I see this analysis on the real data?
 
     Without using the real data this isn't currently possible, however, with real Parkrun data this website could:
 
@@ -564,11 +564,11 @@ def get_average_event_tab(database):
             dcc.Graph(figure=EventAvgYear(database).get_figure()),
             #TODO: Add in-line sex ratio and age distribution scatter plot (y axis men/women ratio, x axis average age?)
             dcc.Markdown('### Typical Event'),
-            dcc.Graph(figure=AverageAttendancePlot(database).get_figure()), 
+            dcc.Graph(figure=AverageAttendancePlot(database).get_figure()),
             dcc.Markdown('''
-            The geometric mean of the attendance at at event since the start of the event. 
+            The geometric mean of the attendance at at event since the start of the event.
             Geometric mean is used here instead of the standard mean is to account for outliers such as very popular events.
-            
+
             The spread is shown as one standard deviation around the mean.
             The abrupt changes in spread are likely due to that fact that outlier events haven't run enough races rather than a change in likelihood of the mean being correct.
             '''),
@@ -577,16 +577,16 @@ def get_average_event_tab(database):
 def get_average_runner_tab(database):
     return [
             dcc.Markdown('''
-            ## Statistics of Athletes 
-            
+            ## Statistics of Athletes
+
             This page explores the demographics and race results of all the different athletes.
-            
+
             '''),
-            dcc.Graph(figure=RunnerTimeDistributionPlot(database).get_figure()), 
+            dcc.Graph(figure=RunnerTimeDistributionPlot(database).get_figure()),
             #dcc.Graph(figure=RunnerGroupsPlot(database).get_figure()),
             dcc.Graph(figure=RunnerGroupsYearPlot(database).get_figure()),
             dcc.Markdown('''
-            The average here is calculated as the median. 
+            The average here is calculated as the median.
             This means 50% of run times were faster and 50% slower than this average.
             '''),
             dcc.Graph(figure=OverallRunAmountsPlot(database).get_figure()),
@@ -599,10 +599,10 @@ def build_full_app(app, config):
     #TODO: Tabs don't change colour on hover
     #TODO: Rather than setting these options for every tab it would probably be better to set some of them for the whole tabs structure
     default_tab_style = {
-            'display': 'block', 
+            'display': 'block',
             'color': 'white',
             'text-align': 'center',
-            'padding': '7px 8px', 
+            'padding': '7px 8px',
             'text-decoration': 'none',
             'border-width': '0px',
             'border-color': '#3275c8'
@@ -627,7 +627,7 @@ def build_full_app(app, config):
                         style=unselected_tab_style,
                         selected_style=selected_tab_style
                         ),
-                    ], 
+                    ],
                     style={
                         'background-color':'#333'
                         }

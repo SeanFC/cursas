@@ -31,73 +31,18 @@ class CursasDatabase():
         :param config: All the configuration values for managing the database>
         :type config: CursasConfig
         """
-        #TODO: Poor way to do this
         self.data_dir = config.data_dir
         self.sample_response_file_name = config.sample_response_file_name
         self.run_ids_file_name = config.run_ids_file_name
         self.full_table_file_name = config.full_table_file_name
         self.attendance_records_grab_file = self.data_dir + 'attendance_records.pkl'
-        self.event_table_file = self.data_dir + 'events.csv'
-        self.run_event_table_file = self.data_dir + 'run_events.csv'
-        self.athlete_table_file = self.data_dir + 'athletes.csv'
-        self.results_table_file = self.data_dir + 'results.csv'
 
-    def full_database_refresh(self, pull_config, regrab=False):
-        """
-        Create the database from scratch
-
-        :param pull_config: The configuration options for pulling the database from an external source as a
-                            tuple of the external website address, the user agent to use to access the website.
-        :type pull_config: 2-tuple
-        :param regrab: Should the necessary parts of the database be downloaded (Default False).
-        :type regrab: boolean
-        """
-        self.refresh_event_names(pull_config, regrab)
-
-        #TODO: Lots of things aren't done here. This database refresh stuff should be put as its own class
-
-    def refresh_event_names(self, pull_config, regrab=False):
-        """
-        Generate the list of event names.
-
-        :param pull_config: The configuration options for pulling the database from an external source as a
-                            tuple of the external website address, the user agent to use to access the website.
-        :type pull_config: 2-tuple
-        :param regrab: Should the event names be generated from an external source (Default False).
-        :type regrab: boolean
-        """
-        external_website_db, user_agent = pull_config
-
-        # If we generating from an external source then download the necessary information.
-        if regrab:
-            response = requests.get(external_website_db+'/results/attendancerecords/', headers={'User-Agent': user_agent,})
-
-            with open(self.attendance_records_grab_file, 'wb') as attendance_file:
-                pkl.dump((response), attendance_file)
-
-        # Pull up the raw data
-        with open(self.attendance_records_grab_file, 'rb') as attendance_file:
-            response = pkl.load(attendance_file)
-
-        # Parse raw data to get a list of event names
-        soup = BeautifulSoup(response.content, 'html.parser')
-        main_table = soup.find('table', attrs={"id":"results"})
-        table_rows = main_table.find_all('tr')[1:] # Skipping the first row because it is the column names
-        event_names = [ row.find_all('td')[0].get_text() for row in table_rows ]
-        event_name_table = pd.DataFrame(
-                {'Display Name':event_names},
-                index=list(map(lambda x:x.replace(' ','').lower(), event_names)) #TODO: We're assuming these ids are unique
-                )
-
-        # Remove junior races
-        junior_rows = event_name_table.apply(lambda row: 'junior' in row['Display Name'], axis=1)
-        event_name_table = event_name_table[~junior_rows]
-
-        # Remove any duplicates, often present in the data source
-        event_name_table = event_name_table.drop_duplicates()
-
-        # Save results
-        event_name_table.to_csv(self.event_table_file)
+        self.table_addresses = {
+                'event': self.data_dir + 'events.csv',
+                'run': self.data_dir + 'run_events.csv',
+                'athlete': self.data_dir + 'athletes.csv',
+                'result': self.data_dir + 'results.csv'
+                }
 
     ## Getters
     def get_all_events(self):
@@ -107,7 +52,7 @@ class CursasDatabase():
         :return: The full events table.
         :rtype: panads.DataFrame
         """
-        return pd.read_csv(self.event_table_file, index_col=0)
+        return pd.read_csv(self.table_addresses['event'], index_col=0)
 
     def get_all_event_ids(self):
         """
@@ -116,7 +61,7 @@ class CursasDatabase():
         :return: All the event ids.
         :rtype: list
         """
-        return pd.read_csv(self.event_table_file, index_col=0).index.tolist()
+        return pd.read_csv(self.table_addresses['event'], index_col=0).index.tolist()
 
     def get_all_athletes(self):
         """
@@ -125,7 +70,7 @@ class CursasDatabase():
         :return: The full athletes table.
         :rtype: panads.DataFrame
         """
-        return pd.read_csv(self.athlete_table_file, index_col=0)
+        return pd.read_csv(self.table_addresses['athlete'], index_col=0)
 
     def get_all_run_events(self):
         """
@@ -134,7 +79,7 @@ class CursasDatabase():
         :return: The full run events table.
         :rtype: panads.DataFrame
         """
-        return pd.read_csv(self.run_event_table_file, index_col=0, parse_dates=['Date'])
+        return pd.read_csv(self.table_addresses['run_event'], index_col=0, parse_dates=['Date'])
 
     def get_first_run_events(self):
         """
@@ -152,9 +97,18 @@ class CursasDatabase():
         :return: The full results table.
         :rtype: panads.DataFrame
         """
-        return pd.read_csv(self.results_table_file, index_col=0)
+        return pd.read_csv(self.table_addresses['result'], index_col=0)
 
     ## Setters
+    def set_events(self, run_events_table):
+        """
+        Set all the events in the database.
+
+        :param events_table: The new events to use with columns of 'Event ID' and 'Display Name'.
+        :type events_table: pandas.DataFrame
+        """
+        run_events_table.to_csv(self.table_addresses['event'])
+
     def set_run_events(self, run_events_table):
         """
         Set all the run events in the database.
@@ -162,7 +116,7 @@ class CursasDatabase():
         :param run_events_table: The new run events to use with columns of 'Run ID' and 'Date'.
         :type run_events_table: pandas.DataFrame
         """
-        run_events_table.to_csv(self.run_event_table_file)
+        run_events_table.to_csv(self.table_addresses['run_event'])
 
     def set_athletes(self, athletes):
         """
@@ -171,7 +125,7 @@ class CursasDatabase():
         :param athletes: The new athletes to use with columns of 'Sex' and 'Age Group'.
         :type athletes: pandas.DataFrame
         """
-        athletes.to_csv(self.athlete_table_file)
+        athletes.to_csv(self.table_addresses['athlete'])
 
     def set_results(self, results):
         """
@@ -180,7 +134,7 @@ class CursasDatabase():
         :param results: The new results to use with columns of 'Athlete ID', 'Event ID' and 'Time'.
         :type results: pandas.DataFrame
         """
-        results.to_csv(self.results_table_file)
+        results.to_csv(self.table_addresses['result'])
 
 # Note: An alternative approach here is to extend CursasDatabase but until the simulator needs find grained access to
 # how the database is access the simulator and database should be kept separate.
@@ -343,6 +297,49 @@ class SimulateCursasDatabase():
         database.set_athletes(self.generate_simulated_athletes())
         database.set_results(self.generate_simulated_results(database))
 
+def refresh_event_names(database, pull_config, regrab=False):
+    """
+    Generate the list of event names.
+
+    :param pull_config: The configuration options for pulling the database from an external source as a
+                        tuple of the external website address, the user agent to use to access the website.
+    :type pull_config: 2-tuple
+    :param regrab: Should the event names be generated from an external source (Default False).
+    :type regrab: boolean
+    """
+    external_website_db, user_agent = pull_config
+
+    # If we generating from an external source then download the necessary information.
+    if regrab:
+        response = requests.get(external_website_db+'/results/attendancerecords/', headers={'User-Agent': user_agent,})
+
+        with open(database.attendance_records_grab_file, 'wb') as attendance_file:
+            pkl.dump((response), attendance_file)
+
+    # Pull up the raw data
+    with open(database.attendance_records_grab_file, 'rb') as attendance_file:
+        response = pkl.load(attendance_file)
+
+    # Parse raw data to get a list of event names
+    soup = BeautifulSoup(response.content, 'html.parser')
+    main_table = soup.find('table', attrs={"id":"results"})
+    table_rows = main_table.find_all('tr')[1:] # Skipping the first row because it is the column names
+    event_names = [ row.find_all('td')[0].get_text() for row in table_rows ]
+    event_name_table = pd.DataFrame(
+            {'Display Name':event_names},
+            index=list(map(lambda x:x.replace(' ','').lower(), event_names)) #TODO: We're assuming these ids are unique
+            )
+
+    # Remove junior races
+    junior_rows = event_name_table.apply(lambda row: 'junior' in row['Display Name'], axis=1)
+    event_name_table = event_name_table[~junior_rows]
+
+    # Remove any duplicates, often present in the data source
+    event_name_table = event_name_table.drop_duplicates()
+
+    # Save results
+    database.set_events(event_name_table)
+
 def pull_db(conf):
     """
     Recreate the full Cursas database.
@@ -351,5 +348,5 @@ def pull_db(conf):
     :type conf: CursasConfig
     """
     database = CursasDatabase(conf)
-    database.full_database_refresh((conf.external_website_db, conf.user_agent), regrab=False)
+    refresh_event_names(database, (conf.external_website_db, conf.user_agent), regrab=False)
     SimulateCursasDatabase().simulate_full_cursas_database(database)

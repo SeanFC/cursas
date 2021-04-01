@@ -57,9 +57,8 @@ The deploy command is then
     * Sex and gender naming mixing
     * Add a demographics plot (the distributions of age and sex)
     * Red blue colour scheme doesn't really go with the rest of the website. Need a different accent colour than red.
-    * Need some explanation text of under all the plots
 * Clean code and TODO notes in code files.
-
+* Finish initial linting
 
 ## Contact
 Maintained by Sean F. Cleator

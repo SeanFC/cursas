@@ -36,6 +36,8 @@ def get_overview_tab(database):
 
     This website has no affiliation with Parkrun and so has no access to the real data however, if you think you could help change this please **[contact me](https://www.sfcleator.com/contact)**.
 
+    The code for this project is available on this **[website](https://www.sfcleator.com/cgit/cgit.cgi/cursas/)** or on **[Github](https://github.com/SeanFC/cursas)**.
+
     ## Parkrun as a Whole
     '''),
     dcc.Graph(figure=OverallAttendanceEventsPlot(database).get_figure()),

@@ -8,7 +8,7 @@ import re
 import dash
 
 # Internal imports
-from cursas.visualise import build_full_app, build_dev_app
+from cursas.app import build_full_app, build_dev_app
 from cursas.extract import pull_db
 from cursas.config import CursasConfig
 

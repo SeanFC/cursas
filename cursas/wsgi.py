@@ -1,6 +1,6 @@
 import dash
 
-from cursas.visualise import build_full_app
+from cursas.app import build_full_app
 
 from cursas.config import CursasConfig 
 

@@ -52,6 +52,14 @@ The deploy command is then
 * Add a weekly update - how was this weeks event, how was this weeks park run overall (different demographics?), how did individuals do
 * Covid analysis
 * Install as command line program
+* Plotting
+    * Add record times (world record and PR record) to relevant plots
+    * Sex and gender naming mixing
+    * Add a demographics plot (the distributions of age and sex)
+    * Red blue colour scheme doesn't really go with the rest of the website. Need a different accent colour than red.
+    * Need some explanation text of under all the plots
+* Clean code and TODO notes in code files.
+
 
 ## Contact
 Maintained by Sean F. Cleator

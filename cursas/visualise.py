@@ -1,68 +1,116 @@
-#TODO: Add record times (world record and PR record) to relevant plots
-#TODO: Sex and gender naming mixing
-#TODO: Add a demographics plot (the distributions of age and sex)
-#TODO: Red blue colour scheme doesn't really go with the rest of the website. Need a different accent colour than red.
-#TODO: Need some explanation text of under all the plots
+""" Create plotly plots for the Cursas database """
 
-import random
-import time
-import pickle as pkl
+# Standard library imports
 import datetime as dt
 from calendar import monthrange, month_name
 from abc import ABC, abstractmethod
 import os.path as osp
 
+# External imports
 import pandas as pd
 import numpy as np
 import scipy.stats as st
 
-import dash_core_components as dcc
-import dash_html_components as html
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from cursas.extract import CursasDatabase
-
-#TODO: Maybe this can be done with function decorators?
+# Note: Maybe this can be done with function decorators?
 class CachedStatFigure(ABC):
+    """
+    A figure that works by first generating statistics and then generating a plot from the statistics.
+    The statistics table that is generated is cached (saved to disk) and only recreated on request.
+    """
     def __init__(self, database, given_fp):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database.
+        :type database: CursasDatabase
+        :param given_fp: The file path to save the cached statistics to.
+        :type given_fp: string
+        """
         self.cache_file_path = database.data_dir + given_fp
         self.database = database
 
     def get_statistics(self):
+        """
+        Get the statistics table for the figure.
+
+        :return: The statistics table
+        :rtype: pandas.DataFrame
+        :raises RuntimeError: If no statistics have been made.
+        """
         if not osp.isfile(self.cache_file_path):
-           raise RuntimeError('Statistics have never been generated')
+            raise RuntimeError('Statistics have never been generated')
 
         return pd.read_csv(self.cache_file_path)
 
     def create_statistics(self):
+        """
+        Make and cache the statistics for the figure.
+        """
         self.create_statistics_table().to_csv(self.cache_file_path)
 
     @abstractmethod
     def create_statistics_table(self):
-        pass
+        """
+        Create the statistics table that will be cached.
+
+        :return: The statistics to be cached.
+        :rtype: pandas.DataFrame
+        """
 
     @abstractmethod
     def get_figure(self):
-        pass
+        """
+        Generate the figure from the cached statistics.
+
+        :return: The resulting figure.
+        :rtype: plotly.graph_objects.Figure
+        """
 
 class OverallAttendanceEventsPlot(CachedStatFigure):
+    """ The attendance and amount of events held each week for the full database. """
     def __init__(self, database):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database
+        :type database: CursasDatabase
+        """
         super().__init__(database, 'attendance_and_events_overall.csv')
 
     def create_statistics_table(self):
+        """
+        Create the statistics table that can be used to make the figure.
+
+        :return: The statistics to be cached.
+        :rtype: pandas.DataFrame
+        """
+
         #TODO:Dropping na here means we're dropping good debugging information. Lots of these events should have more runners.
         events_df = self.database.get_all_run_events()
         results = self.database.get_all_results().merge(events_df, how='outer', left_on='Event ID', right_index=True).dropna()
 
-        out_df = results.groupby(['Date']).count().merge(events_df.groupby(['Date']).count(), how='outer', left_on='Date', right_on='Date')
+        out_df = results.groupby(['Date']).count().merge(
+                events_df.groupby(['Date']).count(),
+                how='outer',
+                left_on='Date', right_on='Date'
+                )
         out_df = out_df[['Athlete ID', 'Run ID_y']].dropna().sort_values('Date')
         out_df.rename(columns={'Athlete ID':'Attendance', 'Run ID_y':'Races Run'}, inplace=True)
 
         return out_df
 
     def get_figure(self):
+        """
+        Generate the figure from the cached statistics.
+
+        :return: The resulting figure.
+        :rtype: plotly.graph_objects.Figure
+        """
+
         data = self.get_statistics()
         fig = make_subplots(specs=[[{"secondary_y": True}]])
 
@@ -91,12 +139,27 @@ class OverallAttendanceEventsPlot(CachedStatFigure):
         return fig
 
 class YearlyAverageTimePlot(CachedStatFigure):
+    """ The average time every week, separated out into years in the database."""
     def __init__(self, database):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database
+        :type database: CursasDatabase
+        """
         super().__init__(database, 'yearly_average_time_stats.csv')
 
     def create_statistics_table(self):
+        """
+        Create the statistics table that can be used to make the figure.
+
+        :return: The statistics to be cached.
+        :rtype: pandas.DataFrame
+        """
         events_df = self.database.get_all_run_events()
-        results = self.database.get_all_results().merge(events_df, how='outer', left_on='Event ID', right_index=True).dropna()[['Date', 'Time']]
+        results = self.database.get_all_results().merge(
+                events_df, how='outer', left_on='Event ID', right_index=True
+                ).dropna()[['Date', 'Time']]
         results = results.groupby('Date').mean('Time')
         results.reset_index(inplace=True)
 
@@ -106,13 +169,21 @@ class YearlyAverageTimePlot(CachedStatFigure):
         return results
 
     def get_figure(self):
+        """
+        Generate the figure from the cached statistics.
+
+        :return: The resulting figure.
+        :rtype: plotly.graph_objects.Figure
+        """
+
         data = self.get_statistics()
         data['Time'] = data['Time']/60
         data['Year'] = data['Year'].astype(str)
 
         colour_scheme = px.colors.sequential.Bluered
 
-        #Note: The function to create colours wont work for any given colour scheme because the below will only work for rgb(r,g,b) colour strings, not other colour specification types.
+        # Note: The function to create colours wont work for any given colour scheme
+        #       because the below will only work for rgb(r,g,b) colour strings, not other colour specification types.
         colours = {
                 str(y):col
                 for y, col in zip(
@@ -147,10 +218,23 @@ class YearlyAverageTimePlot(CachedStatFigure):
         return fig
 
 class RunnerTimeDistributionPlot(CachedStatFigure):
+    """ The distribution of result times for men and women. """
     def __init__(self, database):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database
+        :type database: CursasDatabase
+        """
         super().__init__(database, 'runner_time_dist.csv')
 
     def create_statistics_table(self):
+        """
+        Create the statistics table that can be used to make the figure.
+
+        :return: The statistics to be cached.
+        :rtype: pandas.DataFrame
+        """
 
         results = self.database.get_all_results()[['Time', 'Athlete ID']]
         athletes = self.database.get_all_athletes()[['Sex']]
@@ -170,15 +254,16 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
         return out_df
 
     def get_figure(self):
+        """
+        Generate the figure from the cached statistics.
+
+        :return: The resulting figure.
+        :rtype: plotly.graph_objects.Figure
+        """
+
         #TODO: Unnamed: 0 column name
         data = self.get_statistics()
 
-        #fig = go.Figure()
-        #fig.add_trace(go.Bar(
-        #    x=x, y=y,
-        #    text=y,
-        #    textposition='auto',
-        #)])
         #TODO: Hover doesn't work well for this plot
         fig = px.bar(data, x='Time', y=['Men', 'Women'])
 
@@ -202,10 +287,23 @@ class RunnerTimeDistributionPlot(CachedStatFigure):
         return fig
 
 class OverallRunAmountsPlot(CachedStatFigure):
+    """ A histogram of the amount runners that have logged an amount of results. """
     def __init__(self, database):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database
+        :type database: CursasDatabase
+        """
         super().__init__(database, 'overall_run_amounts.csv')
 
     def create_statistics_table(self):
+        """
+        Create the statistics table that can be used to make the figure.
+
+        :return: The statistics to be cached.
+        :rtype: pandas.DataFrame
+        """
         results = self.database.get_all_results()#.groupby('Event ID').count()['Time']
         run_amounts = results['Athlete ID'].value_counts()
         bins = np.arange(1, run_amounts.max()+1)
@@ -219,6 +317,13 @@ class OverallRunAmountsPlot(CachedStatFigure):
         return out_df
 
     def get_figure(self):
+        """
+        Generate the figure from the cached statistics.
+
+        :return: The resulting figure.
+        :rtype: plotly.graph_objects.Figure
+        """
+
         data = self.get_statistics()
         fig = px.bar(data, x='Completed Runs', y='Number of Runners', log_y=True, range_y=[1, data['Number of Runners'].max()])
 
@@ -232,13 +337,25 @@ class OverallRunAmountsPlot(CachedStatFigure):
 
         return fig
 
-
 class AverageAttendancePlot(CachedStatFigure):
+    """ The geometric mean of attendance through the lifespan of each event. """
     def __init__(self, database):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database
+        :type database: CursasDatabase
+        """
         super().__init__(database, 'average_attendance.csv')
 
     #TODO: Dropping nan means problem in dataset
     def create_statistics_table(self):
+        """
+        Create the statistics table that can be used to make the figure.
+
+        :return: The statistics to be cached.
+        :rtype: pandas.DataFrame
+        """
         # Pull from database
         events_df = self.database.get_all_run_events()
         attendance = self.database.get_all_results().groupby('Event ID').count()['Time']
@@ -268,6 +385,13 @@ class AverageAttendancePlot(CachedStatFigure):
         return event_tracks
 
     def get_figure(self):
+        """
+        Generate the figure from the cached statistics.
+
+        :return: The resulting figure.
+        :rtype: plotly.graph_objects.Figure
+        """
+
         data = self.get_statistics()
 
         fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -279,7 +403,10 @@ class AverageAttendancePlot(CachedStatFigure):
             secondary_y=False
             )
 
-        std_bound = np.array((data['Mean Attendance'] + data['Std Attendance']/2).tolist() + (data['Mean Attendance'] - data['Std Attendance']/2).tolist()[::-1])
+        std_bound = np.array(
+            (data['Mean Attendance'] + data['Std Attendance']/2).tolist() +
+            (data['Mean Attendance'] - data['Std Attendance']/2).tolist()[::-1]
+            )
         std_bound = np.max(np.vstack((std_bound, [0]*len(std_bound))), axis=0)
 
         fig.add_trace(go.Scatter(
@@ -315,67 +442,28 @@ class AverageAttendancePlot(CachedStatFigure):
 
         return fig
 
-#TODO: This needs to go somewhere
-def plot_single_performance():
-    subject_name = 'Sean CLEATOR'
-
-    with open(full_table_file_name, 'rb') as f:
-        all_events, all_rows = pkl.load(f)
-
-    #TODO: Not a very clean way to do this
-    event_ids = np.array([ int(row.event_id) for row in all_rows ])
-    df = pd.DataFrame([{
-        'Event ID':int(cur_row.event_id),
-        'Run Time':cur_row.time/60,
-        'Position':cur_row.position,
-        }
-        for cur_row in all_rows if cur_row.name == subject_name
-        ])
-
-    date_df = pd.DataFrame([{
-        'Event ID':int(cur_event.event_id),
-        'Time':cur_event.date
-        }
-        for cur_event in all_events
-        ])
-
-    df = df.merge(date_df, on='Event ID')
-    df.set_index('Event ID', inplace=True)
-    df.sort_values('Time', inplace=True)
-
-    #fig = px.line(df, x='Time', y='Run Time') #Note: Should probably be a bar chart really
-
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-
-    # Create figure with secondary y-axis
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-    #x_axis_vals = df['Time']
-    x_axis_vals = np.arange(df.shape[0], dtype=np.int) + 1
-    fig.add_trace(go.Scatter(x=x_axis_vals, y=df['Run Time'], name="Run Time"), secondary_y=False)
-    fig.add_trace(go.Scatter(x=x_axis_vals, y=df['Position'], name="Position"), secondary_y=True)
-
-    fig.update_layout(
-            title=f"The Performance Of {subject_name.title()} At Eastville Parkrun".title(),
-            xaxis=dict(
-                title='Run Number',
-                #title='Time',
-                tickmode='array',
-                tickvals=x_axis_vals,
-                ),
-            yaxis=dict(title='Run Time (m)'),
-            yaxis2=dict(title='Position'),
-            )
-
-    return fig
-
 class RunnerGroupsPlot(CachedStatFigure):
+    """ The average and fastest times of the different age groups and sexes. """
+
     def __init__(self, database, data_file_name='runner_groups_avg_fast.csv'):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database
+        :type database: CursasDatabase
+        :param data_file_name: File name of where to save the data to in the database
+        :type data_file_name: string
+        """
         super().__init__(database, data_file_name)
         self.title = "Average and Fastest Times for Groups of Runners"
 
     def get_useable_results(self):
+        """
+        Get the part of the database needed to generate the statistics, the runner's times and attributes.
+
+        :return: The relevant statistics.
+        :rtype: pandas.DataFrame
+        """
         results = self.database.get_all_results()[['Time', 'Athlete ID']]
         athletes = self.database.get_all_athletes()[['Sex', 'Age Group']]
         results = results.merge(athletes, how='outer', left_on='Athlete ID', right_index=True).dropna()
@@ -385,6 +473,12 @@ class RunnerGroupsPlot(CachedStatFigure):
         return results
 
     def create_statistics_table(self):
+        """
+        Create the statistics table that can be used to make the figure.
+
+        :return: The statistics to be cached.
+        :rtype: pandas.DataFrame
+        """
         stats_df = self.get_useable_results().groupby(['Sex', 'Age Group']).agg([
             'min',
             'median',
@@ -410,6 +504,13 @@ class RunnerGroupsPlot(CachedStatFigure):
         return stats_df
 
     def get_figure(self):
+        """
+        Generate the figure from the cached statistics.
+
+        :return: The resulting figure.
+        :rtype: plotly.graph_objects.Figure
+        """
+
         data = self.get_statistics()
         fig = px.scatter(data, x='Average', y='Fastest', size='Number of Records', color='Sex', hover_data=['Age Group'])
 
@@ -422,11 +523,24 @@ class RunnerGroupsPlot(CachedStatFigure):
         return fig
 
 class RunnerGroupsYearPlot(RunnerGroupsPlot):
+    """ The average and fastest times of the different age groups and sexes over the last year. """
     def __init__(self, database):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database.
+        :type database: CursasDatabase
+        """
         super().__init__(database, data_file_name='runner_groups_avg_fast.csv')
         self.title = "Average and Fastest Times for Groups of Runners for the Last Year"
 
     def get_useable_results(self):
+        """
+        Get the part of the database needed to generate the statistics, the runner's times and attributes for the last year.
+
+        :return: The relevant statistics.
+        :rtype: pandas.DataFrame
+        """
         results = self.database.get_all_results()[['Time', 'Athlete ID', 'Event ID']]
         athletes = self.database.get_all_athletes()[['Sex', 'Age Group']]
         events = self.database.get_all_run_events()
@@ -444,10 +558,23 @@ class RunnerGroupsYearPlot(RunnerGroupsPlot):
         return results[['Sex', 'Age Group', 'Time']]
 
 class EventAvgYear(CachedStatFigure):
+    """ A scatter plot for every different event with the average result time and attendance for the last year"""
     def __init__(self, database):
+        """
+        Constructor
+
+        :param database: The accessor for the Cursas database
+        :type database: CursasDatabase
+        """
         super().__init__(database, 'event_avg_year.csv')
 
     def create_statistics_table(self):
+        """
+        Create the statistics table that can be used to make the figure.
+
+        :return: The statistics to be cached.
+        :rtype: pandas.DataFrame
+        """
         events = self.database.get_all_events()
         run_events = self.database.get_all_run_events()
         results = self.database.get_all_results()
@@ -463,9 +590,18 @@ class EventAvgYear(CachedStatFigure):
         run_event_stats = run_event_stats[run_event_stats['Date'] > cutoff_date]
 
         out_df = run_event_stats[['Attendance', 'Time', 'Run ID']].groupby('Run ID').apply(np.mean)
-        return out_df.merge(events, how='inner', left_on='Run ID', right_index=True).rename(columns={'Display Name':'Event Display Name'})
+        return out_df\
+                .merge(events, how='inner', left_on='Run ID', right_index=True)\
+                .rename(columns={'Display Name':'Event Display Name'})
 
     def get_figure(self):
+        """
+        Generate the figure from the cached statistics.
+
+        :return: The resulting figure.
+        :rtype: plotly.graph_objects.Figure
+        """
+
         data = self.get_statistics()
         data['Time']/=60
 
@@ -480,170 +616,3 @@ class EventAvgYear(CachedStatFigure):
             yaxis_title="Average Time (minutes)",
         )
         return fig
-
-#TODO: Move the below stuff to it's own module
-def get_navbar():
-    return html.Ul(
-            className="topnav",
-            children=[
-                html.Li(html.A('Home', href='/')),
-                html.Li(html.A('Cursas', href='', className="active")),
-                html.Li(html.A('Repositories', href='/cgit')),
-                html.Li(html.A('Contact', href='/contact.html'), style={'float':'right'}),
-                ]
-            )
-
-def get_overview_tab(database):
-    return [dcc.Markdown('''
-    # Explore Simulated Parkrun Data
-
-    **[Parkrun](https://www.parkrun.com/)** is a series of free to enter 5 kilometre running races held weekly across the world.
-    This website shows interactive analysis on a **[simulated](#simulated)** version of the finish times for these races.
-
-    This website has no affiliation with Parkrun and so has no access to the real data however, if you think you could help change this please **[contact me](https://www.sfcleator.com/contact)**.
-
-    ## Parkrun as a Whole
-    '''),
-    dcc.Graph(figure=OverallAttendanceEventsPlot(database).get_figure()),
-    dcc.Graph(figure=YearlyAverageTimePlot(database).get_figure()),
-    dcc.Markdown('''
-    ## Simulated Dataset
-
-    Instead of using the real Parkrun data this project instead simulates completely fictional races, athletes and run times.
-    The distributions of various aspects of the dataset (e.g. sex ratios, amount of races run etc.) are designed to mimic what I think would appear in the real dataset.
-    However, the information of specific events or athletes isn't designed to match the real dataset and so any similarities are purely coincidental.
-    Note this is most relevant in the way that the event names may be similar to the real event names however, any specific data about these events isn't designed to match the real thing.
-
-    ### Why?
-
-    Although the real data is available on the Parkrun website it is asked that you don't scrape it.
-    Further, the real data may contain personally identifiable data which generally requires extra care.
-    Hence, I've opted to build up the data analysis infrastructure seen here with the hope of working on similar real data in the future.
-
-    ### How?
-
-    A rough description of how the data is simulated can be explained in four main steps:
-
-    1. A set of events is generated - Each event has a typical name and date of first event. The distribution of the date of first events is set to start small and increase over time.
-    2. For each event a set of 'run events', a race that took place on some Saturday, is generated. These start at the date of the first event and go on Saturday to the present day. Random Saturdays are skipped to simulated cancelled events.
-    3. A set of athletes are generated with a sex, age group, home event, typical result time, first participated event and number of event participations. The distribution of athlete attributes is selected to be a basic approximation of what is expected in the real data.
-    4. For each athlete a result time is generated for a simulated list of run events that the athlete took part in. The time is randomly generated based on the athlete's attributes (age, typical result time, etc.). The list of run events is a random selection of the run events at the athlete's home event that the athlete could feasibly take part in (considering when their first event was and how many runs they've done.
-
-    This isn't the full process for how the dataset is created as additional steps are taken to ensure that unrealistic data doesn't creep in such as someone competing in two events as once.
-    Further, this is a very crude simulation of the real data and it is possible this simulation will improve in the future.
-    Some of the bigger problems include:
-
-    * It is likely that result times are much more nuanced than the model used here.
-    * Athletes only run at their home event .
-    * Several of the distributions used are either unrealistic (e.g. the age groups are poorly distributed).
-    * Features of the data such as result times and attendance don't take into account extra factors such as course difficulty or weather.
-
-    ### Can I see this analysis on the real data?
-
-    Without using the real data this isn't currently possible, however, with real Parkrun data this website could:
-
-    * Make predictions about attendance and running times
-    * Showcase the public's ability to run a 5K race
-    * Help answer questions about common technical about Parkrun
-
-    I'm very keen to discuss opportunities for performing these sorts of analyses on the real Parkrun data or similar datasets.
-    If you work for/with Parkrun or work like to discuss how to apply this to your dataset please **[contact me](https://www.sfcleator.com/contact)**.
-    ''', id='simulated'),
-    ]
-
-def get_average_event_tab(database):
-    return [
-            dcc.Markdown('''
-            ## Statistics of Events
-
-            An event describes the location, management team, etc. that runs races on most Saturdays.
-            This page to compares all the different events against each other and shows what a typical event looks like statistically.
-
-            ### Event Comparison
-            '''),
-            dcc.Graph(figure=EventAvgYear(database).get_figure()),
-            #TODO: Add in-line sex ratio and age distribution scatter plot (y axis men/women ratio, x axis average age?)
-            dcc.Markdown('### Typical Event'),
-            dcc.Graph(figure=AverageAttendancePlot(database).get_figure()),
-            dcc.Markdown('''
-            The geometric mean of the attendance at at event since the start of the event.
-            Geometric mean is used here instead of the standard mean is to account for outliers such as very popular events.
-
-            The spread is shown as one standard deviation around the mean.
-            The abrupt changes in spread are likely due to that fact that outlier events haven't run enough races rather than a change in likelihood of the mean being correct.
-            '''),
-            ]
-
-def get_average_runner_tab(database):
-    return [
-            dcc.Markdown('''
-            ## Statistics of Athletes
-
-            This page explores the demographics and race results of all the different athletes.
-
-            '''),
-            dcc.Graph(figure=RunnerTimeDistributionPlot(database).get_figure()),
-            #dcc.Graph(figure=RunnerGroupsPlot(database).get_figure()),
-            dcc.Graph(figure=RunnerGroupsYearPlot(database).get_figure()),
-            dcc.Markdown('''
-            The average here is calculated as the median.
-            This means 50% of run times were faster and 50% slower than this average.
-            '''),
-            dcc.Graph(figure=OverallRunAmountsPlot(database).get_figure()),
-            #dcc.Graph(figure=plot_single_performance()), #TODO: Move to single runner lookup tab
-            ]
-
-def build_full_app(app, config):
-    database = CursasDatabase(config)
-
-    #TODO: Tabs don't change colour on hover
-    #TODO: Rather than setting these options for every tab it would probably be better to set some of them for the whole tabs structure
-    default_tab_style = {
-            'display': 'block',
-            'color': 'white',
-            'text-align': 'center',
-            'padding': '7px 8px',
-            'text-decoration': 'none',
-            'border-width': '0px',
-            'border-color': '#3275c8'
-            }
-    unselected_tab_style = {**default_tab_style, 'background-color': '#333'}
-    selected_tab_style = {**default_tab_style, 'background-color': '#3275c8'}
-
-    app.layout = html.Div(className="grid-container", children=[
-        html.Div(className="main", children=[
-            html.Div(className="header", children=[
-                get_navbar(),
-                dcc.Tabs([
-                    dcc.Tab(label='Overview', children=get_overview_tab(database),
-                        style=unselected_tab_style,
-                        selected_style=selected_tab_style
-                        ),
-                    dcc.Tab(label='Events', children=get_average_event_tab(database),
-                        style=unselected_tab_style,
-                        selected_style=selected_tab_style
-                        ),
-                    dcc.Tab(label='Athletes', children=get_average_runner_tab(database),
-                        style=unselected_tab_style,
-                        selected_style=selected_tab_style
-                        ),
-                    ],
-                    style={
-                        'background-color':'#333'
-                        }
-                    )
-    ])])])
-
-    return app
-
-def build_dev_app(app, config):
-    dev_figure_class = RunnerGroupsYearPlot(
-            CursasDatabase(config)
-            )
-
-    dev_figure_class.create_statistics()
-
-    app.layout = html.Div(className="grid-container", children=[
-        dcc.Graph(figure=dev_figure_class.get_figure())
-        ])
-    return app

@@ -17,6 +17,12 @@ from cursas.visualise import (
         )
 
 def get_navbar():
+    """
+    Create the website wide navigation bar in Dash.
+
+    :return: The dash based navigation bar element.
+    :rtype: dash_html_components.html.Ul
+    """
     return html.Ul(
             className="topnav",
             children=[
@@ -28,6 +34,15 @@ def get_navbar():
             )
 
 def get_overview_tab(database):
+    """
+    Create the main overview tab for the website.
+
+    :param database: The database to make all the relevant figures and numbers from.
+    :type database: CursasDatabase
+
+    :return: List of html elements for the main tab
+    :rtype: List of dash elements.
+    """
     return [dcc.Markdown('''
     # Explore Simulated Parkrun Data
 
@@ -88,6 +103,15 @@ def get_overview_tab(database):
     ]
 
 def get_average_event_tab(database):
+    """
+    Create a tab to describe the statistics of an average event in the database.
+
+    :param database: The database to make all the relevant figures and numbers from.
+    :type database: CursasDatabase
+
+    :return: List of html elements for the tab.
+    :rtype: List of dash elements.
+    """
     return [
             dcc.Markdown('''
             ## Statistics of Events
@@ -111,6 +135,15 @@ def get_average_event_tab(database):
             ]
 
 def get_average_runner_tab(database):
+    """
+    Create a tab to describe the statistics of an average athlete in the database.
+
+    :param database: The database to make all the relevant figures and numbers from.
+    :type database: CursasDatabase
+
+    :return: List of html elements for the tab.
+    :rtype: List of dash elements.
+    """
     return [
             dcc.Markdown('''
             ## Statistics of Athletes
@@ -130,6 +163,17 @@ def get_average_runner_tab(database):
             ]
 
 def build_full_app(app, config):
+    """
+    Add all the necessary UI elements to a Dash application to build the full application.
+
+    :param app: The application to add UI elements to.
+    :type app: dash.Dash
+    :param config: The configuration values of the project.
+    :type config: CursasConfig
+
+    :return: The application with all the UI elements added.
+    :rtype: dash.Dash
+    """
     database = CursasDatabase(config)
 
     #TODO: Tabs don't change colour on hover
@@ -174,12 +218,24 @@ def build_full_app(app, config):
     return app
 
 def build_dev_app(app, config):
+    """
+    Build a dash application with just one figure on it for development purposes.
+
+    :param app: The application to add UI elements to.
+    :type app: dash.Dash
+    :param config: The configuration values of the project.
+    :type config: CursasConfig
+
+    :return: The application with all the UI elements added.
+    :rtype: dash.Dash
+    """
+    # Build figure and create any needed statistics
     dev_figure_class = RunnerGroupsYearPlot(
             CursasDatabase(config)
             )
-
     dev_figure_class.create_statistics()
 
+    # Add figure to the layout
     app.layout = html.Div(className="grid-container", children=[
         dcc.Graph(figure=dev_figure_class.get_figure())
         ])

@@ -24,11 +24,11 @@ to generate the full website.
 
 For development a site with a single graph can be run with 
 ```
-python -m curas dev 
+python -m cursas dev 
 ```
 and the database can be create/pulled with
 ```
-python -m curas pull
+python -m cursas pull
 ```
 
 ## Deploy
@@ -51,7 +51,7 @@ The deploy command is then
 * Need to use assets of wider website
 * Add a weekly update - how was this weeks event, how was this weeks park run overall (different demographics?), how did individuals do
 * Covid analysis
-* Install as command line program
+* Install as command line program (python -m cursas -> ./cursas)
 * Plotting
     * Add record times (world record and PR record) to relevant plots
     * Sex and gender naming mixing
@@ -59,6 +59,7 @@ The deploy command is then
     * Red blue colour scheme doesn't really go with the rest of the website. Need a different accent colour than red.
 * Clean code and TODO notes in code files.
 * Finish initial linting
+* Write tests for database simulator
 
 ## Contact
 Maintained by Sean F. Cleator

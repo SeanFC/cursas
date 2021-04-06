@@ -1,6 +1,22 @@
+"""
+Left over code to parse requests from external database.
+
+TODO: This code needs further development and integration into the rest of the code base before use.
+"""
+
+# Standard library imports
 from os import listdir
 from os.path import isfile, join
 import re
+import datetime as dt
+import pickle as pkl
+import time
+import random
+
+# External library imports
+from bs4 import BeautifulSoup
+import requests
+import numpy as np
 
 class RunEvent():
     def __init__(self, header, run_name, event_id):
@@ -57,16 +73,16 @@ class ResultEntry():
     def __repr__(self):
         return "<ResultEntry Object, athl id={}>".format(self.athlete_id)
 
-def grab_latest_run():
-    headers = {'User-Agent': user_agent,}
-    response = requests.get(external_website_db+'/eastville/results/latestresults/', headers=headers)
+def grab_latest_run(config):
+    headers = {'User-Agent': config.user_agent,}
+    response = requests.get(config.external_website_db+'/eastville/results/latestresults/', headers=headers)
 
-    with open(sample_response_file_name, 'wb') as f:
-        pkl.dump((response), f)
+    with open(config.sample_response_file_name, 'wb') as cur_file:
+        pkl.dump((response), cur_file)
 
 def parse_single_run(file_name, run_name, event_id):
-    with open(file_name, 'rb') as f:
-        response = pkl.load(f)
+    with open(file_name, 'rb') as cur_file:
+        response = pkl.load(cur_file)
     soup = BeautifulSoup(response.content, 'html.parser')
 
     #TODO: Also scrape volunteer data
@@ -77,41 +93,43 @@ def parse_single_run(file_name, run_name, event_id):
 
     return RunEvent(header, run_name, event_id), [ ResultEntry(row, run_name, event_id) for row in table_rows ]
 
+def grab_all_run_ids(config):
+    headers = {'User-Agent': config.user_agent,}
+    response = requests.get(config.external_website_db+'/eastville/results/eventhistory/', headers=headers)
 
-def grab_all_run_ids():
-    headers = {'User-Agent': user_agent,}
-    response = requests.get(external_website_db+'/eastville/results/eventhistory/', headers=headers)
+    with open(config.run_ids_file_name, 'wb') as cur_file:
+        pkl.dump((response), cur_file)
 
-    with open(run_ids_file_name, 'wb') as f:
-        pkl.dump((response), f)
-
-def parse_all_run_ids():
-    with open(run_ids_file_name, 'rb') as f:
-        sample_response = pkl.load(f)
+def parse_all_run_ids(config):
+    with open(config.run_ids_file_name, 'rb') as cur_file:
+        sample_response = pkl.load(cur_file)
     soup = BeautifulSoup(sample_response.content, 'html.parser')
 
     main_table = soup.find('table', attrs={"id":"results"}).find("tbody")
     table_rows = main_table.find_all('tr')#, attrs={"class":" even"})
 
-    return [ r.find("td").find("a").string for r in table_rows ]
+    return [ row.find("td").find("a").string for row in table_rows ]
 
-def grab_all_runs_from_ids(ids):
-    headers = {'User-Agent': user_agent,}
-    only_files = [f.split('.')[0] for f in listdir('out/eastville') if isfile(join('out/eastville', f))]
-    target_ids = list(set(ids) - set(only_files))#[:2]
+def grab_all_runs_from_ids(config, ids):
+    headers = {'User-Agent': config.user_agent,}
+    only_files = [cur_file.split('.')[0] for cur_file in listdir('out/eastville') if isfile(join('out/eastville', cur_file))]
+    target_ids = list(set(ids) - set(only_files))
 
     random.shuffle(target_ids)
     for cur_id in target_ids:
         print(cur_id)
-        response = requests.get(external_website_db+'/eastville/results/weeklyresults/?runSeqNumber={}'.format(cur_id), headers=headers)
+        response = requests.get(
+                config.external_website_db+'/eastville/results/weeklyresults/?runSeqNumber={}'.format(cur_id),
+                headers=headers
+                )
 
-        with open('out/eastville/{}.pkl'.format(cur_id), 'wb') as f:
-            pkl.dump((response), f)
+        with open('out/eastville/{}.pkl'.format(cur_id), 'wb') as cur_file:
+            pkl.dump((response), cur_file)
 
-        time.sleep(np.random.rand()*20)
+        time.sleep(np.random.rand()*20) # Give a pause between requests to not overload database
 
-def generate_full_run_table(run_name):
-    only_files = [f.split('.')[0] for f in listdir('out/eastville') if isfile(join('out/eastville', f))]
+def generate_full_run_table(config, run_name):
+    only_files = [cur_file.split('.')[0] for cur_file in listdir('out/eastville') if isfile(join('out/eastville', cur_file))]
 
     all_rows = []
     all_events = []
@@ -124,11 +142,10 @@ def generate_full_run_table(run_name):
         for row in row_entries:
             all_rows.append(row)
 
-    with open(full_table_file_name, 'wb') as full_table_file:
+    with open(config.full_table_file_name, 'wb') as full_table_file:
         pkl.dump((all_events, all_rows), full_table_file)
 
 if __name__ == "__main__":
     #event_ids = parse_all_run_ids()
     #grab_all_runs_from_ids(event_ids)
-
-    generate_full_run_table('eastville')
+    #generate_full_run_table('eastville')

@@ -213,8 +213,8 @@ class SimulateCursasDatabase():
 
         return pd.DataFrame({'Sex':sexes, 'Age Group':age_groups})
 
-    # The approach here is to simulate each athlete's running 'career' one by one and then add any
-    # additional information to each race as needed
+    # The approach here is to simulate each athlete's running 'career' one at a time and then add any
+    # additional information to each race as needed.
     def generate_simulated_results(self, database):
         """
         Create random results for athletes running at run events.
@@ -228,15 +228,21 @@ class SimulateCursasDatabase():
         :return: The simulated results.
         :rtype: pandas.DataFrame
         """
+        #TODO: This function needs upgrading (for better modelling and lower computation cost) which will likely
+        #      result in a rewrite. Until This happens the pylint warning is disabled as this can be fixed at
+        #      at the same time.
+        #pylint: disable=too-many-locals
+
+        # Pull in needed elements from the database
         athletes = database.get_all_athletes()
         event_ids = database.get_all_event_ids()
+        all_run_events = database.get_all_run_events()
+        events_first_run_event = database.get_first_run_events()
 
         # Give everyone a 'home event' where they usually run at.
         # We shuffle the events since the distribution is based on their order (which is often alphabetical)
         np.random.shuffle(event_ids)
         home_events = np.array(event_ids)[(sps.beta(0.5, 0.5).rvs(size=len(athletes))*len(event_ids)).astype(int)]
-
-        events_first_run_event = database.get_first_run_events()
 
         #TODO: Awkward date handling here
         max_career_lengths_weeks = np.floor(
@@ -252,7 +258,6 @@ class SimulateCursasDatabase():
                 (max_career_lengths_weeks - career_lengths_weeks)*sps.beta(5,2).rvs(len(career_lengths_weeks))
                 ).astype(int)
 
-        all_run_events = database.get_all_run_events()
         held_results = {'Athlete ID':[], 'Event ID':[], 'Time':[]} #TODO: Would be nice to preregister the size of these
 
         #TODO: This loop is quite inefficient
